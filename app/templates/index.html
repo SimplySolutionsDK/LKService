@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tidsregistrering CSV Parser</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --accent-primary: #3b82f6;
+            --accent-secondary: #60a5fa;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #2d3a4f;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --overtime1: #fbbf24;
+            --overtime2: #f97316;
+            --overtime3: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background-image: 
+                radial-gradient(ellipse at top, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .container.preview-active {
+            max-width: 1400px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-primary), #8b5cf6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+        }
+
+        .upload-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .upload-section.with-preview {
+            grid-template-columns: 380px 1fr;
+        }
+
+        @media (max-width: 1024px) {
+            .upload-section.with-preview {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title-icon {
+            color: var(--accent-secondary);
+        }
+
+        .dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(59, 130, 246, 0.02);
+        }
+
+        .dropzone:hover,
+        .dropzone.dragover {
+            border-color: var(--accent-primary);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .dropzone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .dropzone-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .dropzone-text strong {
+            color: var(--accent-secondary);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 1rem;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 0.4rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .file-item-info {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .file-icon {
+            color: var(--accent-secondary);
+        }
+
+        .file-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .file-size {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .remove-file {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.25rem;
+            transition: color 0.2s ease;
+        }
+
+        .remove-file:hover {
+            color: var(--error);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.4rem;
+            color: var(--text-secondary);
+        }
+
+        select {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.8rem center;
+            padding-right: 2.2rem;
+        }
+
+        select:hover,
+        select:focus {
+            border-color: var(--accent-primary);
+            outline: none;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px var(--accent-glow);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #16a34a);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        .status {
+            padding: 0.85rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            display: none;
+            font-size: 0.9rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .status.success {
+            display: block;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .status.error {
+            display: block;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        .status.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-secondary);
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .info-box strong {
+            color: var(--accent-secondary);
+        }
+
+        /* Preview Section */
+        .preview-section {
+            display: none;
+        }
+
+        .preview-section.active {
+            display: block;
+        }
+
+        .preview-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .preview-title {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .preview-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .preview-tab {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .preview-tab:hover {
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+        }
+
+        .preview-tab.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
+        }
+
+        .preview-stats {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-value.overtime1 { color: var(--overtime1); }
+        .stat-value.overtime2 { color: var(--overtime2); }
+        .stat-value.overtime3 { color: var(--overtime3); }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th, td {
+            padding: 0.7rem 0.9rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-secondary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        td.number {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        td.overtime1 { color: var(--overtime1); font-weight: 500; }
+        td.overtime2 { color: var(--overtime2); font-weight: 500; }
+        td.overtime3 { color: var(--overtime3); font-weight: 500; }
+
+        .day-sunday {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .day-saturday {
+            background: rgba(249, 115, 22, 0.08);
+        }
+
+        .export-bar {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .export-format {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .export-format label {
+            margin-bottom: 0;
+            font-size: 0.85rem;
+        }
+
+        .export-format select {
+            width: auto;
+            min-width: 180px;
+        }
+
+        .export-btn {
+            width: auto;
+            padding: 0.65rem 1.5rem;
+        }
+
+        footer {
+            margin-top: auto;
+            padding-top: 2rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .call-out-cell {
+            text-align: center;
+        }
+
+        .call-out-checkbox {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            margin-right: 0.25rem;
+        }
+
+        .call-out-checkbox:disabled {
+            cursor: not-allowed;
+            opacity: 0.3;
+        }
+
+        .call-out-indicator {
+            font-size: 1rem;
+            cursor: help;
+        }
+
+        .stat-value.call-out { color: var(--warning); }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--error);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .modal-table th {
+            background: var(--bg-secondary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+        }
+
+        .modal-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .modal-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .modal-table tr:hover td {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .details-cell {
+            text-align: center;
+        }
+
+        .details-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            transition: transform 0.2s ease;
+            opacity: 0.7;
+        }
+
+        .details-btn:hover {
+            transform: scale(1.2);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainContainer">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">⏱</div>
+                <h1>Tidsregistrering Parser</h1>
+            </div>
+            <p class="subtitle">Upload CSV-filer og få dem formateret med overtidsberegning</p>
+        </header>
+
+        <div class="upload-section" id="uploadSection">
+            <!-- Left Column: Upload Form -->
+            <div class="upload-column">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="card">
+                        <h2 class="card-title">
+                            <span class="card-title-icon">📁</span>
+                            Upload CSV Filer
+                        </h2>
+                        
+                        <div class="dropzone" id="dropzone">
+                            <div class="dropzone-icon">📄</div>
+                            <p class="dropzone-text">
+                                <strong>Klik for at vælge filer</strong><br>
+                                eller træk og slip CSV-filer her
+                            </p>
+                        </div>
+                        
+                        <input type="file" id="fileInput" name="files" class="file-input" multiple accept=".csv">
+                        
+                        <div class="file-list" id="fileList"></div>
+                    </div>
+
+                    <div class="card">
+                        <h2 class="card-title">
+                            <span class="card-title-icon">⚙️</span>
+                            Indstillinger
+                        </h2>
+                        
+                        <div class="form-group">
+                            <label for="employeeType">Medarbejdertype</label>
+                            <select id="employeeType" name="employee_type">
+                                <option value="Svend" selected>Svend (Faglært)</option>
+                                <option value="Lærling">Lærling</option>
+                                <option value="Funktionær">Funktionær</option>
+                                <option value="Elev">Elev (Handels/Kontor)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <button type="submit" class="btn btn-primary" id="previewBtn" disabled>
+                            <span>👁</span>
+                            Vis Preview
+                        </button>
+                        
+                        <div class="status" id="status"></div>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br>
+                        • Normtid: 37 timer ugentligt, 07:00-17:00 på hverdage<br>
+                        • Overtid 1: Første 3 timer over 37 timer (+35% for svende)<br>
+                        • Overtid 2: Timer udover de første 3 overtimer (+100%)<br>
+                        • Overtid 3: Søndags- og helligdagsarbejde (+100%)
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Column: Preview -->
+            <div class="preview-section" id="previewSection">
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <h3 class="preview-title">
+                            <span>📊</span>
+                            Data Forhåndsvisning
+                        </h3>
+                        <div class="preview-tabs">
+                            <button class="preview-tab active" data-tab="daily">Daglig</button>
+                            <button class="preview-tab" data-tab="weekly">Ugentlig</button>
+                        </div>
+                    </div>
+
+                    <div class="preview-stats" id="previewStats">
+                        <div class="stat">
+                            <span class="stat-label">Registreringer</span>
+                            <span class="stat-value" id="statRecords">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Total Timer</span>
+                            <span class="stat-value" id="statTotal">0.00</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Normal</span>
+                            <span class="stat-value" id="statNormal">0.00</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Overtid 1</span>
+                            <span class="stat-value overtime1" id="statOT1">0.00</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Overtid 2</span>
+                            <span class="stat-value overtime2" id="statOT2">0.00</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Overtid 3</span>
+                            <span class="stat-value overtime3" id="statOT3">0.00</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Call Out Dage</span>
+                            <span class="stat-value call-out" id="statCallOutDays">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Call Out Betaling</span>
+                            <span class="stat-value call-out" id="statCallOutPayment">0 kr</span>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table id="previewTable">
+                            <thead id="tableHead"></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="export-bar">
+                        <div class="export-format">
+                            <label for="outputFormat">Eksport format:</label>
+                            <select id="outputFormat" name="output_format">
+                                <option value="daily" selected>Daglig oversigt</option>
+                                <option value="weekly">Ugentlig opsummering</option>
+                                <option value="combined">Kombineret (begge)</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-success export-btn" id="exportBtn">
+                            <span>📥</span>
+                            Download CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Entries Modal -->
+    <div id="entriesModal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Tidsregistreringer</h3>
+                <button class="modal-close" id="modalCloseBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>Sag Nr</th>
+                            <th>Start</th>
+                            <th>Slut</th>
+                            <th>Timer</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Tidsregistrering CSV Parser v1.0 • Baseret på DBR/Industriens Overenskomst 2026
+    </footer>
+
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const previewBtn = document.getElementById('previewBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const status = document.getElementById('status');
+        const form = document.getElementById('uploadForm');
+        const previewSection = document.getElementById('previewSection');
+        const uploadSection = document.getElementById('uploadSection');
+        const mainContainer = document.getElementById('mainContainer');
+        const tableHead = document.getElementById('tableHead');
+        const tableBody = document.getElementById('tableBody');
+
+        let selectedFiles = [];
+        let previewData = null;
+        let sessionId = null;
+        let currentTab = 'daily';
+        let callOutSelections = {};
+
+        // Dropzone click handler
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        // Drag and drop handlers
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.csv'));
+            addFiles(files);
+        });
+
+        // File input change handler
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+        });
+
+        function addFiles(files) {
+            files.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name)) {
+                    selectedFiles.push(file);
+                }
+            });
+            renderFileList();
+            updateButtons();
+            hidePreview();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFileList();
+            updateButtons();
+            hidePreview();
+        }
+
+        function renderFileList() {
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-item-info">
+                        <span class="file-icon">📄</span>
+                        <div>
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <button type="button" class="remove-file" onclick="removeFile(${index})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function updateButtons() {
+            previewBtn.disabled = selectedFiles.length === 0;
+        }
+
+        function showStatus(type, message) {
+            status.className = 'status ' + type;
+            if (type === 'loading') {
+                status.innerHTML = `<div class="spinner"></div><span>${message}</span>`;
+            } else {
+                status.textContent = message;
+            }
+        }
+
+        function hideStatus() {
+            status.className = 'status';
+            status.style.display = 'none';
+        }
+
+        function showPreview() {
+            previewSection.classList.add('active');
+            uploadSection.classList.add('with-preview');
+            mainContainer.classList.add('preview-active');
+        }
+
+        function hidePreview() {
+            previewSection.classList.remove('active');
+            uploadSection.classList.remove('with-preview');
+            mainContainer.classList.remove('preview-active');
+            previewData = null;
+            sessionId = null;
+            callOutSelections = {};
+        }
+
+        function handleCallOutChange(date, checked) {
+            callOutSelections[date] = checked;
+            updateStats(previewData);
+        }
+
+        function renderDailyTable(data) {
+            tableHead.innerHTML = `
+                <tr>
+                    <th>Medarbejder</th>
+                    <th>Dato</th>
+                    <th>Dag</th>
+                    <th>Type</th>
+                    <th>Total</th>
+                    <th>Normtid</th>
+                    <th>Udenfor</th>
+                    <th>Uge</th>
+                    <th>Uge Total</th>
+                    <th>Normal</th>
+                    <th>OT1</th>
+                    <th>OT2</th>
+                    <th>OT3</th>
+                    <th title="Call Out betaling (750 kr) for vagter der starter før 07:00 eller efter 15:30">Call Out 🕐</th>
+                    <th>Detaljer</th>
+                </tr>
+            `;
+
+            tableBody.innerHTML = data.map((row, index) => {
+                let rowClass = '';
+                if (row.day_type === 'Sunday') rowClass = 'day-sunday';
+                else if (row.day_type === 'Saturday') rowClass = 'day-saturday';
+
+                const isEligible = row.has_call_out_qualifying_time;
+                const isChecked = callOutSelections[row.date] || false;
+                const checkboxHtml = isEligible 
+                    ? `<input type="checkbox" class="call-out-checkbox" data-date="${row.date}" ${isChecked ? 'checked' : ''} onchange="handleCallOutChange('${row.date}', this.checked)">
+                       <span class="call-out-indicator" title="Kvalificerer til Call Out betaling">⏰</span>`
+                    : `<input type="checkbox" class="call-out-checkbox" disabled title="Ingen registreringer udenfor normal tid">`;
+
+                return `
+                    <tr class="${rowClass}">
+                        <td>${row.worker}</td>
+                        <td>${row.date}</td>
+                        <td>${row.day}</td>
+                        <td>${row.day_type}</td>
+                        <td class="number">${row.total_hours.toFixed(2)}</td>
+                        <td class="number">${row.hours_norm_time.toFixed(2)}</td>
+                        <td class="number">${row.hours_outside_norm.toFixed(2)}</td>
+                        <td class="number">${row.week_number}</td>
+                        <td class="number">${row.weekly_total.toFixed(2)}</td>
+                        <td class="number">${row.normal_hours.toFixed(2)}</td>
+                        <td class="number ${row.overtime_1 > 0 ? 'overtime1' : ''}">${row.overtime_1.toFixed(2)}</td>
+                        <td class="number ${row.overtime_2 > 0 ? 'overtime2' : ''}">${row.overtime_2.toFixed(2)}</td>
+                        <td class="number ${row.overtime_3 > 0 ? 'overtime3' : ''}">${row.overtime_3.toFixed(2)}</td>
+                        <td class="call-out-cell">${checkboxHtml}</td>
+                        <td class="details-cell">
+                            <button class="details-btn" onclick="openEntriesModal(${index})" title="Vis tidsregistreringer">
+                                📋
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderWeeklyTable(data) {
+            tableHead.innerHTML = `
+                <tr>
+                    <th>Medarbejder</th>
+                    <th>År</th>
+                    <th>Uge</th>
+                    <th>Total Timer</th>
+                    <th>Normal Timer</th>
+                    <th>Overtid 1</th>
+                    <th>Overtid 2</th>
+                    <th>Overtid 3</th>
+                </tr>
+            `;
+
+            tableBody.innerHTML = data.map(row => `
+                <tr>
+                    <td>${row.worker_name}</td>
+                    <td class="number">${row.year}</td>
+                    <td class="number">${row.week_number}</td>
+                    <td class="number">${row.total_hours.toFixed(2)}</td>
+                    <td class="number">${row.normal_hours.toFixed(2)}</td>
+                    <td class="number ${row.overtime_1 > 0 ? 'overtime1' : ''}">${row.overtime_1.toFixed(2)}</td>
+                    <td class="number ${row.overtime_2 > 0 ? 'overtime2' : ''}">${row.overtime_2.toFixed(2)}</td>
+                    <td class="number ${row.overtime_3 > 0 ? 'overtime3' : ''}">${row.overtime_3.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateStats(data) {
+            const daily = data.daily;
+            const weekly = data.weekly;
+
+            document.getElementById('statRecords').textContent = daily.length;
+
+            let totalHours = 0, normalHours = 0, ot1 = 0, ot2 = 0, ot3 = 0;
+            weekly.forEach(w => {
+                totalHours += w.total_hours;
+                normalHours += w.normal_hours;
+                ot1 += w.overtime_1;
+                ot2 += w.overtime_2;
+                ot3 += w.overtime_3;
+            });
+
+            document.getElementById('statTotal').textContent = totalHours.toFixed(2);
+            document.getElementById('statNormal').textContent = normalHours.toFixed(2);
+            document.getElementById('statOT1').textContent = ot1.toFixed(2);
+            document.getElementById('statOT2').textContent = ot2.toFixed(2);
+            document.getElementById('statOT3').textContent = ot3.toFixed(2);
+
+            // Calculate call out statistics
+            let callOutQualifyingDays = 0;
+            let callOutSelectedCount = 0;
+            daily.forEach(d => {
+                if (d.has_call_out_qualifying_time) {
+                    callOutQualifyingDays++;
+                    if (callOutSelections[d.date]) {
+                        callOutSelectedCount++;
+                    }
+                }
+            });
+
+            document.getElementById('statCallOutDays').textContent = `${callOutSelectedCount}/${callOutQualifyingDays}`;
+            document.getElementById('statCallOutPayment').textContent = `${callOutSelectedCount * 750} kr`;
+        }
+
+        function renderTable() {
+            if (!previewData) return;
+
+            if (currentTab === 'daily') {
+                renderDailyTable(previewData.daily);
+            } else {
+                renderWeeklyTable(previewData.weekly);
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.preview-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentTab = tab.dataset.tab;
+                renderTable();
+            });
+        });
+
+        // Modal functions
+        function openEntriesModal(rowIndex) {
+            if (!previewData || !previewData.daily || !previewData.daily[rowIndex]) {
+                return;
+            }
+
+            const row = previewData.daily[rowIndex];
+            const modal = document.getElementById('entriesModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalTableBody = document.getElementById('modalTableBody');
+
+            // Update modal title
+            modalTitle.textContent = `Tidsregistreringer - ${row.worker} - ${row.date}`;
+
+            // Sort entries by start time
+            const entries = row.entries || [];
+            entries.sort((a, b) => {
+                if (a.start_time < b.start_time) return -1;
+                if (a.start_time > b.start_time) return 1;
+                return 0;
+            });
+
+            // Populate modal table
+            modalTableBody.innerHTML = entries.map(entry => {
+                const caseNumber = entry.case_number || 'N/A';
+                const activity = entry.activity || '';
+                const displayText = entry.case_number ? caseNumber : activity;
+                
+                return `
+                    <tr>
+                        <td>${displayText}</td>
+                        <td>${entry.start_time}</td>
+                        <td>${entry.end_time}</td>
+                        <td class="number">${entry.total_hours.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Show modal
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeEntriesModal() {
+            const modal = document.getElementById('entriesModal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        // Modal event listeners
+        document.getElementById('modalCloseBtn').addEventListener('click', closeEntriesModal);
+        
+        document.getElementById('entriesModal').addEventListener('click', (e) => {
+            if (e.target.id === 'entriesModal') {
+                closeEntriesModal();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('entriesModal');
+                if (!modal.classList.contains('hidden')) {
+                    closeEntriesModal();
+                }
+            }
+        });
+
+        // Form submit handler - Preview
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (selectedFiles.length === 0) return;
+
+            showStatus('loading', 'Behandler filer...');
+            previewBtn.disabled = true;
+
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            formData.append('employee_type', document.getElementById('employeeType').value);
+
+            try {
+                const response = await fetch('/api/preview', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    previewData = result;
+                    sessionId = result.session_id;
+                    
+                    updateStats(result);
+                    renderTable();
+                    showPreview();
+                    hideStatus();
+                    showStatus('success', `✓ ${result.total_records} registreringer behandlet fra ${selectedFiles.length} fil(er)`);
+                } else {
+                    showStatus('error', `✕ Fejl: ${result.detail || 'Ukendt fejl'}`);
+                }
+            } catch (err) {
+                showStatus('error', `✕ Fejl: ${err.message}`);
+            }
+
+            updateButtons();
+        });
+
+        // Export button handler
+        exportBtn.addEventListener('click', async () => {
+            if (!sessionId) {
+                showStatus('error', '✕ Ingen data at eksportere. Upload filer først.');
+                return;
+            }
+
+            const outputFormat = document.getElementById('outputFormat').value;
+
+            const formData = new FormData();
+            formData.append('output_format', outputFormat);
+            formData.append('call_out_selections', JSON.stringify(callOutSelections));
+
+            try {
+                const response = await fetch(`/api/export/${sessionId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'time_registration.csv';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+                    
+                    // Trigger download
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                    showStatus('success', `✓ Download startet: ${filename}`);
+                } else {
+                    const error = await response.json();
+                    showStatus('error', `✕ Fejl: ${error.detail || 'Ukendt fejl'}`);
+                }
+            } catch (err) {
+                showStatus('error', `✕ Fejl: ${err.message}`);
+            }
+        });
+    </script>
+</body>
+</html>
