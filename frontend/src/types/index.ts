@@ -26,6 +26,8 @@ export interface DailyRecord {
   overtime_breakdown: OvertimeBreakdown;
   has_call_out_qualifying_time: boolean;
   entries: TimeEntry[];
+  absent_type?: AbsenceType;
+  credited_hours?: number;
 }
 
 export interface WeeklyRecord {
@@ -53,6 +55,12 @@ export type TabType = 'daily' | 'weekly';
 
 export interface CallOutSelections {
   [date: string]: boolean;
+}
+
+export type AbsenceType = 'None' | 'Vacation' | 'Sick' | 'Kursus';
+
+export interface AbsenceSelections {
+  [date: string]: AbsenceType;
 }
 
 export interface StatusMessage {

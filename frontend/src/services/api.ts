@@ -1,4 +1,4 @@
-import type { PreviewData, EmployeeType, OutputFormat, CallOutSelections } from '../types';
+import type { PreviewData, EmployeeType, OutputFormat, CallOutSelections, AbsenceSelections } from '../types';
 
 export const api = {
   async preview(files: File[], employeeType: EmployeeType): Promise<PreviewData> {
@@ -39,6 +39,23 @@ export const api = {
     }
 
     return response.blob();
+  },
+
+  async markAbsence(sessionId: string, absenceSelections: AbsenceSelections): Promise<PreviewData> {
+    const formData = new FormData();
+    formData.append('absence_selections', JSON.stringify(absenceSelections));
+    
+    const response = await fetch(`/api/mark-absence/${sessionId}`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to mark absence');
+    }
+    
+    return response.json();
   },
 
   getFilename(response: Response): string {

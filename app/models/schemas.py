@@ -23,6 +23,7 @@ class AbsentType(str, Enum):
     VACATION = "Vacation"
     SICK = "Sick"
     PUBLIC_HOLIDAY = "Public Holiday"
+    KURSUS = "Kursus"
 
 
 class TimeEntry(BaseModel):

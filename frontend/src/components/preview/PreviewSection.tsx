@@ -4,7 +4,7 @@ import { PreviewTabs } from './PreviewTabs';
 import { DailyTable } from './DailyTable';
 import { WeeklyTable } from './WeeklyTable';
 import { ExportBar } from './ExportBar';
-import type { PreviewData, TabType, OutputFormat, CallOutSelections } from '../../types';
+import type { PreviewData, TabType, OutputFormat, CallOutSelections, AbsenceSelections, AbsenceType } from '../../types';
 import './PreviewSection.css';
 
 interface PreviewSectionProps {
@@ -12,9 +12,11 @@ interface PreviewSectionProps {
   activeTab: TabType;
   outputFormat: OutputFormat;
   callOutSelections: CallOutSelections;
+  absenceSelections: AbsenceSelections;
   onTabChange: (tab: TabType) => void;
   onFormatChange: (format: OutputFormat) => void;
   onCallOutChange: (date: string, checked: boolean) => void;
+  onAbsenceChange: (date: string, absenceType: AbsenceType) => void;
   onShowDetails: (index: number) => void;
   onExport: () => void;
 }
@@ -24,9 +26,11 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
   activeTab,
   outputFormat,
   callOutSelections,
+  absenceSelections,
   onTabChange,
   onFormatChange,
   onCallOutChange,
+  onAbsenceChange,
   onShowDetails,
   onExport,
 }) => {
@@ -47,7 +51,9 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
           <DailyTable
             data={data.daily}
             callOutSelections={callOutSelections}
+            absenceSelections={absenceSelections}
             onCallOutChange={onCallOutChange}
+            onAbsenceChange={onAbsenceChange}
             onShowDetails={onShowDetails}
           />
         ) : (

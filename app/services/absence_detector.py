@@ -37,6 +37,13 @@ HOLIDAY_KEYWORDS = [
     "grundlovsdag"
 ]
 
+KURSUS_KEYWORDS = [
+    "kursus",
+    "course",
+    "training",
+    "uddannelse"
+]
+
 
 def detect_absence_from_activity(record: DailyRecord) -> AbsentType:
     """
@@ -68,6 +75,11 @@ def detect_absence_from_activity(record: DailyRecord) -> AbsentType:
         for keyword in HOLIDAY_KEYWORDS:
             if keyword in activity_lower:
                 return AbsentType.PUBLIC_HOLIDAY
+        
+        # Check for kursus keywords
+        for keyword in KURSUS_KEYWORDS:
+            if keyword in activity_lower:
+                return AbsentType.KURSUS
     
     return AbsentType.NONE
 

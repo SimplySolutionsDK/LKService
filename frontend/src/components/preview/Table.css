@@ -119,3 +119,82 @@ td.overtime3 { color: var(--overtime3); font-weight: 500; }
     transform: scale(1.2);
     opacity: 1;
 }
+
+.details-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+}
+
+/* Empty row styling */
+.empty-row {
+    background: rgba(148, 163, 184, 0.05);
+}
+
+.empty-row td {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Absence-specific row highlighting */
+.absence-vacation {
+    background: rgba(251, 191, 36, 0.15) !important;
+}
+
+.absence-sick {
+    background: rgba(59, 130, 246, 0.15) !important;
+}
+
+.absence-kursus {
+    background: rgba(16, 185, 129, 0.15) !important;
+}
+
+/* Absence selector button group */
+.absence-selector {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.absence-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.absence-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--primary);
+}
+
+.absence-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    font-weight: 500;
+}
+
+/* Specific absence type button colors when active */
+.absence-btn.active:nth-child(2) {
+    /* Vacation - yellow */
+    background: #f59e0b;
+    border-color: #f59e0b;
+}
+
+.absence-btn.active:nth-child(3) {
+    /* Sick - blue */
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.absence-btn.active:nth-child(4) {
+    /* Kursus - green */
+    background: #10b981;
+    border-color: #10b981;
+}

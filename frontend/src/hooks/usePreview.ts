@@ -4,6 +4,8 @@ import type {
   TabType, 
   OutputFormat, 
   CallOutSelections, 
+  AbsenceSelections,
+  AbsenceType,
   StatusMessage, 
   EmployeeType 
 } from '../types';
@@ -14,6 +16,7 @@ export const usePreview = () => {
   const [activeTab, setActiveTab] = useState<TabType>('daily');
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('daily');
   const [callOutSelections, setCallOutSelections] = useState<CallOutSelections>({});
+  const [absenceSelections, setAbsenceSelections] = useState<AbsenceSelections>({});
   const [status, setStatus] = useState<StatusMessage | undefined>();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +28,7 @@ export const usePreview = () => {
       const data = await api.preview(files, employeeType);
       setPreviewData(data);
       setCallOutSelections({});
+      setAbsenceSelections({});
       setStatus({
         type: 'success',
         message: `✓ ${data.total_records} registreringer behandlet fra ${files.length} fil(er)`,
@@ -95,9 +99,28 @@ export const usePreview = () => {
     setCallOutSelections(prev => ({ ...prev, [date]: checked }));
   }, []);
 
+  const updateAbsenceSelection = useCallback(async (date: string, absenceType: AbsenceType) => {
+    const newSelections = { ...absenceSelections, [date]: absenceType };
+    setAbsenceSelections(newSelections);
+    
+    // Call backend to recalculate hours
+    if (previewData?.session_id) {
+      try {
+        const updatedData = await api.markAbsence(previewData.session_id, newSelections);
+        setPreviewData(updatedData);
+      } catch (error) {
+        setStatus({
+          type: 'error',
+          message: `✕ Fejl ved opdatering: ${error instanceof Error ? error.message : 'Ukendt fejl'}`,
+        });
+      }
+    }
+  }, [absenceSelections, previewData]);
+
   const clearPreview = useCallback(() => {
     setPreviewData(null);
     setCallOutSelections({});
+    setAbsenceSelections({});
     setStatus(undefined);
   }, []);
 
@@ -106,6 +129,7 @@ export const usePreview = () => {
     activeTab,
     outputFormat,
     callOutSelections,
+    absenceSelections,
     status,
     isLoading,
     setActiveTab,
@@ -113,6 +137,7 @@ export const usePreview = () => {
     loadPreview,
     exportData,
     updateCallOutSelection,
+    updateAbsenceSelection,
     clearPreview,
   };
 };

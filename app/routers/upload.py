@@ -18,6 +18,7 @@ from app.services.csv_generator import (
 )
 from app.services.call_out_detector import mark_call_out_eligibility, get_call_out_eligible_days, apply_call_out_payment
 from app.services.absence_detector import mark_absence_types
+from app.services.date_filler import fill_missing_dates
 
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -156,6 +157,9 @@ async def preview_data(
         # Calculate overtime
         summaries, outputs = process_all_records(all_records, emp_type)
         
+        # Fill in missing dates per worker
+        outputs = fill_missing_dates(outputs)
+        
         # Get call out eligible days information
         call_out_eligible_days = get_call_out_eligible_days(all_records)
         
@@ -269,6 +273,93 @@ async def export_from_preview(
     )
 
 
+@router.post("/mark-absence/{session_id}")
+async def mark_absence(
+    session_id: str,
+    absence_selections: str = Form(default="{}")
+):
+    """
+    Apply absence types to empty days and recalculate hours.
+    
+    Args:
+        session_id: Session ID from preview
+        absence_selections: JSON string mapping dates to absence types
+            Example: {"2026-01-15": "Vacation", "2026-01-16": "Sick"}
+    
+    Returns:
+        Updated preview data with credited hours applied
+    """
+    if session_id not in preview_cache:
+        raise HTTPException(status_code=404, detail="Preview session not found. Please upload files again.")
+    
+    cached = preview_cache[session_id]
+    outputs = cached["outputs"]
+    
+    # Parse absence selections
+    try:
+        absence_dict = json.loads(absence_selections)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid absence selections format")
+    
+    # Update outputs with absence types and credited hours
+    for output in outputs:
+        if output.date in absence_dict:
+            absence_type = absence_dict[output.date]
+            
+            # Map string to AbsentType enum
+            absent_type_map = {
+                "Vacation": "Vacation",
+                "Sick": "Sick",
+                "Kursus": "Kursus",
+                "None": "None"
+            }
+            
+            if absence_type in absent_type_map:
+                # This is a DailyOutput object, not DailyRecord
+                # We need to track absence for recalculation but DailyOutput doesn't have absent_type
+                # We'll need to add credited hours directly
+                if absence_type != "None":
+                    # Standard daily credit: 7.4 hours
+                    output.total_hours = 7.4
+                    output.normal_hours = 7.4
+                else:
+                    # Reset to empty if None selected
+                    if len(output.entries) == 0:
+                        output.total_hours = 0.0
+                        output.normal_hours = 0.0
+    
+    # Recalculate weekly summaries with updated hours
+    from app.services.overtime_calculator import recalculate_weekly_summaries
+    summaries = recalculate_weekly_summaries(outputs)
+    
+    # Update cache
+    preview_cache[session_id]["outputs"] = outputs
+    preview_cache[session_id]["summaries"] = summaries
+    
+    # Convert to dictionaries for JSON response
+    daily_data = []
+    for output in outputs:
+        output_dict = output.model_dump()
+        # Convert time objects to strings in entries
+        for entry in output_dict.get('entries', []):
+            if 'start_time' in entry and entry['start_time']:
+                entry['start_time'] = entry['start_time'].strftime('%H:%M') if hasattr(entry['start_time'], 'strftime') else str(entry['start_time'])
+            if 'end_time' in entry and entry['end_time']:
+                entry['end_time'] = entry['end_time'].strftime('%H:%M') if hasattr(entry['end_time'], 'strftime') else str(entry['end_time'])
+        daily_data.append(output_dict)
+    
+    weekly_data = [summary.model_dump() for summary in summaries]
+    
+    return JSONResponse(content={
+        "success": True,
+        "session_id": session_id,
+        "daily": daily_data,
+        "weekly": weekly_data,
+        "total_records": len(outputs),
+        "total_weeks": len(summaries)
+    })
+
+
 @router.post("/process")
 async def process_and_download(
     files: List[UploadFile] = File(...),
@@ -321,6 +412,9 @@ async def process_and_download(
         
         # Calculate overtime
         summaries, outputs = process_all_records(all_records, emp_type)
+        
+        # Fill in missing dates per worker
+        outputs = fill_missing_dates(outputs)
         
         # Generate CSV based on format
         if output_format == "weekly":

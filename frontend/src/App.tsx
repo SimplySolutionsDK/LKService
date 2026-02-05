@@ -21,6 +21,7 @@ function App() {
     activeTab,
     outputFormat,
     callOutSelections,
+    absenceSelections,
     status,
     isLoading,
     setActiveTab,
@@ -28,6 +29,7 @@ function App() {
     loadPreview,
     exportData,
     updateCallOutSelection,
+    updateAbsenceSelection,
     clearPreview,
   } = usePreview();
 
@@ -97,9 +99,11 @@ function App() {
             activeTab={activeTab}
             outputFormat={outputFormat}
             callOutSelections={callOutSelections}
+            absenceSelections={absenceSelections}
             onTabChange={setActiveTab}
             onFormatChange={setOutputFormat}
             onCallOutChange={updateCallOutSelection}
+            onAbsenceChange={updateAbsenceSelection}
             onShowDetails={handleShowDetails}
             onExport={exportData}
           />

@@ -1,18 +1,22 @@
 import React from 'react';
-import type { DailyRecord, CallOutSelections } from '../../types';
+import type { DailyRecord, CallOutSelections, AbsenceSelections, AbsenceType } from '../../types';
 import './Table.css';
 
 interface DailyTableProps {
   data: DailyRecord[];
   callOutSelections: CallOutSelections;
+  absenceSelections: AbsenceSelections;
   onCallOutChange: (date: string, checked: boolean) => void;
+  onAbsenceChange: (date: string, absenceType: AbsenceType) => void;
   onShowDetails: (index: number) => void;
 }
 
 export const DailyTable: React.FC<DailyTableProps> = ({
   data,
   callOutSelections,
+  absenceSelections,
   onCallOutChange,
+  onAbsenceChange,
   onShowDetails,
 }) => {
   return (
@@ -31,7 +35,7 @@ export const DailyTable: React.FC<DailyTableProps> = ({
             <th title="Hverdage: 5.+ overtidstime (143,70 kr)">OT Hvd 5+</th>
             <th title="Lørdag timer (dag: 76,80 kr, nat: 143,70 kr)">OT Lør</th>
             <th title="Søndag timer (før 12: 95,75 kr, efter 12: 143,70 kr)">OT Søn</th>
-            <th title="Call Out betaling (750 kr) for vagter der starter før 07:00 eller efter 15:30">Call Out 🕐</th>
+            <th title="Call Out betaling (750 kr) for vagter der starter før 07:00 eller efter 15:30">Call Out / Fravær</th>
             <th>Detaljer</th>
           </tr>
         </thead>
@@ -41,12 +45,23 @@ export const DailyTable: React.FC<DailyTableProps> = ({
             const ot_lor_total = otb.ot_saturday_day + otb.ot_saturday_night;
             const ot_son_total = otb.ot_sunday_before_noon + otb.ot_sunday_after_noon;
             
+            const isEmpty = row.entries.length === 0;
+            const isEligible = row.has_call_out_qualifying_time;
+            const isChecked = callOutSelections[row.date] || false;
+            const currentAbsence = absenceSelections[row.date] || 'None';
+            
             let rowClass = '';
             if (row.day_type === 'Sunday') rowClass = 'day-sunday';
             else if (row.day_type === 'Saturday') rowClass = 'day-saturday';
-
-            const isEligible = row.has_call_out_qualifying_time;
-            const isChecked = callOutSelections[row.date] || false;
+            
+            // Add empty row styling
+            if (isEmpty) {
+              rowClass += ' empty-row';
+              // Add absence-specific styling
+              if (currentAbsence === 'Vacation') rowClass += ' absence-vacation';
+              else if (currentAbsence === 'Sick') rowClass += ' absence-sick';
+              else if (currentAbsence === 'Kursus') rowClass += ' absence-kursus';
+            }
 
             return (
               <tr key={index} className={rowClass}>
@@ -72,7 +87,38 @@ export const DailyTable: React.FC<DailyTableProps> = ({
                   {ot_son_total.toFixed(2)}
                 </td>
                 <td className="call-out-cell">
-                  {isEligible ? (
+                  {isEmpty ? (
+                    <div className="absence-selector">
+                      <button
+                        className={`absence-btn ${currentAbsence === 'None' ? 'active' : ''}`}
+                        onClick={() => onAbsenceChange(row.date, 'None')}
+                        title="Ingen fravær"
+                      >
+                        -
+                      </button>
+                      <button
+                        className={`absence-btn ${currentAbsence === 'Vacation' ? 'active' : ''}`}
+                        onClick={() => onAbsenceChange(row.date, 'Vacation')}
+                        title="Ferie (7.4 timer)"
+                      >
+                        Ferie
+                      </button>
+                      <button
+                        className={`absence-btn ${currentAbsence === 'Sick' ? 'active' : ''}`}
+                        onClick={() => onAbsenceChange(row.date, 'Sick')}
+                        title="Syg (7.4 timer)"
+                      >
+                        Syg
+                      </button>
+                      <button
+                        className={`absence-btn ${currentAbsence === 'Kursus' ? 'active' : ''}`}
+                        onClick={() => onAbsenceChange(row.date, 'Kursus')}
+                        title="Kursus (7.4 timer)"
+                      >
+                        Kursus
+                      </button>
+                    </div>
+                  ) : isEligible ? (
                     <>
                       <input
                         type="checkbox"
@@ -96,6 +142,7 @@ export const DailyTable: React.FC<DailyTableProps> = ({
                     className="details-btn"
                     onClick={() => onShowDetails(index)}
                     title="Vis tidsregistreringer"
+                    disabled={isEmpty}
                   >
                     📋
                   </button>

@@ -495,3 +495,72 @@ def process_all_records(
         all_outputs.extend(outputs)
     
     return all_summaries, all_outputs
+
+
+def recalculate_weekly_summaries(outputs: list[DailyOutput]) -> list[WeeklySummary]:
+    """
+    Recalculate weekly summaries from daily outputs.
+    Used when daily hours are updated (e.g., absence marking).
+    
+    Args:
+        outputs: List of DailyOutput objects
+        
+    Returns:
+        List of WeeklySummary objects
+    """
+    # Group by worker and week
+    grouped: Dict[Tuple[str, int, int], list[DailyOutput]] = defaultdict(list)
+    
+    for output in outputs:
+        # Parse year from date string (DD-MM-YYYY)
+        date_parts = output.date.split('-')
+        year = int(date_parts[2])
+        key = (output.worker, year, output.week_number)
+        grouped[key].append(output)
+    
+    summaries: list[WeeklySummary] = []
+    
+    # Process each week
+    for (worker_name, year, week_number), week_outputs in sorted(grouped.items()):
+        # Calculate weekly totals
+        weekly_total = 0.0
+        weekly_norm_used = 0.0
+        weekly_ot_hours = 0.0
+        weekly_breakdown = OvertimeBreakdown()
+        
+        for output in week_outputs:
+            weekly_total += output.total_hours
+            weekly_norm_used += output.normal_hours
+            
+            # Sum up overtime from breakdown
+            ot_from_breakdown = (
+                output.overtime_breakdown.ot_weekday_hour_1_2 +
+                output.overtime_breakdown.ot_weekday_hour_3_4 +
+                output.overtime_breakdown.ot_weekday_hour_5_plus +
+                output.overtime_breakdown.ot_saturday_day +
+                output.overtime_breakdown.ot_saturday_night +
+                output.overtime_breakdown.ot_sunday_before_noon +
+                output.overtime_breakdown.ot_sunday_after_noon
+            )
+            weekly_ot_hours += ot_from_breakdown
+            
+            # Merge overtime breakdowns
+            weekly_breakdown = merge_overtime_breakdowns(weekly_breakdown, output.overtime_breakdown)
+        
+        # Calculate legacy overtime values
+        week_ot1, week_ot2, week_ot3 = calculate_legacy_overtime_values(weekly_breakdown)
+        
+        summary = WeeklySummary(
+            worker_name=worker_name,
+            week_number=week_number,
+            year=year,
+            total_hours=round(weekly_total, 2),
+            normal_hours=round(weekly_norm_used, 2),
+            overtime_breakdown=weekly_breakdown,
+            overtime_1=round(week_ot1, 2),
+            overtime_2=round(week_ot2, 2),
+            overtime_3=round(week_ot3, 2)
+        )
+        summaries.append(summary)
+    
+    return summaries
