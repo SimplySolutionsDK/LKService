@@ -7,6 +7,7 @@ Time Registration CSV Parser - A FastAPI application for processing time registr
 - **CSV File Processing**: Upload and parse time registration CSV files
 - **Overtime Calculation**: Automatic overtime calculations following Danish automotive industry collective agreement rules
 - **Multiple Employee Types**: Support for Lærling, Svend, Funktionær, and Elev
+- **Credited Hours**: Automatic crediting of vacation, sick days, and public holidays (7.4 hours per day) toward weekly norm
 - **Call-out Detection**: Identifies and handles call-out eligible time entries
 - **Multiple Export Formats**: Daily, weekly, or combined CSV output
 - **Web Interface**: User-friendly interface for file upload and data preview
@@ -14,17 +15,25 @@ Time Registration CSV Parser - A FastAPI application for processing time registr
 
 ## Technology Stack
 
+### Backend
 - **FastAPI**: Modern Python web framework
 - **Uvicorn**: ASGI server
 - **Pandas**: Data processing
 - **Pydantic**: Data validation
-- **Jinja2**: Template rendering
+
+### Frontend
+- **React 18**: UI framework
+- **TypeScript**: Type safety
+- **Vite**: Build tool and dev server
+- **CSS Modules**: Component-scoped styling
 
 ## Local Development
 
 ### Prerequisites
 
 - Python 3.11 or higher
+- Node.js 20.19+ or 22.12+
+- npm 11+
 - pip
 
 ### Installation
@@ -35,25 +44,70 @@ git clone https://github.com/yourusername/LKService.git
 cd LKService
 ```
 
-2. Create a virtual environment:
+2. **Backend Setup**:
 ```bash
+# Create a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-3. Install dependencies:
+3. **Frontend Setup**:
 ```bash
-pip install -r requirements.txt
+# Navigate to frontend directory
+cd frontend
+
+# Install Node.js dependencies
+npm install
+
+# Build the frontend for production
+npm run build
+
+# Return to project root
+cd ..
 ```
 
 ### Running Locally
 
-Start the development server:
+#### Development Mode
+
+For active development, run both the backend and frontend in separate terminals:
+
+**Terminal 1 - Backend:**
+```bash
+# From project root
+cd app
+uvicorn main:app --reload
+```
+
+**Terminal 2 - Frontend:**
+```bash
+# From project root
+cd frontend
+npm run dev
+```
+
+The frontend dev server (http://localhost:5173) will proxy API requests to the backend (http://localhost:8000).
+
+#### Production Mode
+
+For production-like testing with the built frontend:
+
+1. Build the frontend (if not already done):
+```bash
+cd frontend
+npm run build
+cd ..
+```
+
+2. Start the backend server:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The application will be available at `http://localhost:8000`
+The application will be available at `http://localhost:8000` serving the built React app.
 
 ### API Endpoints
 
@@ -122,6 +176,7 @@ LKService/
 │   │   ├── time_calculator.py
 │   │   ├── overtime_calculator.py
 │   │   ├── call_out_detector.py
+│   │   ├── absence_detector.py  # Vacation/sick/holiday detection
 │   │   └── csv_generator.py
 │   └── templates/
 │       └── index.html       # Web interface
@@ -139,3 +194,100 @@ All rights reserved.
 ## Support
 
 For issues or questions, please open an issue in the GitHub repository.
+
+
+
+# Credited Hours for Vacation, Sick Days, and Public Holidays
+
+## Overview
+
+The system now automatically credits **7.4 hours** (37 hours ÷ 5 days) toward the weekly norm for vacation days, sick days, and public holidays. This ensures that overtime is calculated correctly when employees have days off.
+
+## How It Works
+
+### Standard Daily Credit
+- **7.4 hours** are credited for each vacation, sick, or public holiday day
+- These credited hours count toward the 37-hour weekly norm
+- Any work hours beyond the norm (including credited hours) count as overtime
+
+### Example Scenarios
+
+#### Scenario 1: Wednesday Vacation Day
+- Monday: 8 hours worked
+- Tuesday: 8 hours worked
+- Wednesday: 0 hours worked, **7.4 hours credited** (vacation)
+- Thursday: 8 hours worked
+- Friday: 8 hours worked
+
+**Calculation:**
+- Total worked: 32 hours
+- Total credited: 7.4 hours
+- **Weekly total: 39.4 hours**
+- Normal hours: 37 hours
+- **Overtime: 2.4 hours**
+
+#### Scenario 2: Thursday & Friday Public Holidays
+- Monday: 10 hours worked
+- Tuesday: 10 hours worked
+- Wednesday: 10 hours worked
+- Thursday: 0 hours worked, **7.4 hours credited** (public holiday)
+- Friday: 0 hours worked, **7.4 hours credited** (public holiday)
+
+**Calculation:**
+- Total worked: 30 hours
+- Total credited: 14.8 hours (7.4 × 2)
+- **Weekly total: 44.8 hours**
+- Normal hours: 37 hours
+- **Overtime: 7.8 hours**
+
+## Automatic Detection
+
+The system automatically detects absence types based on activity keywords in Danish or English:
+
+### Vacation (Ferie)
+- "ferie"
+- "vacation"
+- "afspadsering"
+- "fridag"
+
+### Sick Leave (Syg)
+- "syg"
+- "sygdom"
+- "sick"
+- "barns sygedag"
+- "barns 1. sygedag"
+- "barns 2. sygedag"
+
+### Public Holidays (Helligdage)
+- "helligdag"
+- "holiday"
+- "public holiday"
+- "juledag"
+- "nytårsdag"
+- "påske"
+- "pinse"
+- "store bededag"
+- "kr. himmelfartsdag"
+- "grundlovsdag"
+
+## CSV Input Example
+
+If an employee registers a time entry with activity "Ferie" on a day, that day will automatically be credited with 7.4 hours:
+
+```csv
+Tidsregistrering
+Jakob Nielsen
+
+Onsdag 15-01-2026
+Aktivitet:;Start Tid:;Pause:;Slut Tid:;Varighed:
+Ferie;00:00;;00:00;0 Timer 0 Minutter
+```
+
+This will result in:
+- Worked hours: 0
+- Credited hours: 7.4
+- Day counted as vacation for overtime calculation
+
+## Manual Override
+
+If automatic detection doesn't work, the system can be extended to support manual marking of days through the UI or API endpoints.

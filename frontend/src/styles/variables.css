@@ -1,0 +1,18 @@
+:root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #1a2332;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #60a5fa;
+    --accent-glow: rgba(59, 130, 246, 0.3);
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border-color: #2d3a4f;
+    --success: #22c55e;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --overtime1: #fbbf24;
+    --overtime2: #f97316;
+    --overtime3: #ef4444;
+}

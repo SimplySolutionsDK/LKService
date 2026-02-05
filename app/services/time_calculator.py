@@ -8,6 +8,13 @@ from app.models.schemas import TimeEntry, DailyRecord, DayType
 NORM_START = time(7, 0)
 NORM_END = time(17, 0)
 
+# Overtime day/night boundaries (06:00 - 18:00)
+OT_DAY_START = time(6, 0)
+OT_DAY_END = time(18, 0)
+
+# Sunday noon split
+SUNDAY_NOON = time(12, 0)
+
 
 def time_to_minutes(t: time) -> int:
     """Convert time object to minutes since midnight."""
@@ -113,3 +120,93 @@ def process_records_with_segments(records: list[DailyRecord]) -> list[DailyRecor
         calculate_daily_segments(record)
     
     return records
+
+
+def split_time_by_boundary(start: time, end: time, boundary: time) -> Tuple[float, float]:
+    """
+    Split a time period by a boundary time (e.g., 18:00).
+    
+    Args:
+        start: Start time of the work period
+        end: End time of the work period
+        boundary: Boundary time to split by
+        
+    Returns:
+        Tuple of (hours_before_boundary, hours_after_boundary)
+    """
+    start_minutes = time_to_minutes(start)
+    end_minutes = time_to_minutes(end)
+    boundary_minutes = time_to_minutes(boundary)
+    
+    # Handle case where end is before start
+    if end_minutes <= start_minutes:
+        return 0.0, 0.0
+    
+    total_minutes = end_minutes - start_minutes
+    
+    # All time is before boundary
+    if end_minutes <= boundary_minutes:
+        return minutes_to_hours(total_minutes), 0.0
+    
+    # All time is after boundary
+    if start_minutes >= boundary_minutes:
+        return 0.0, minutes_to_hours(total_minutes)
+    
+    # Time spans the boundary
+    before_minutes = boundary_minutes - start_minutes
+    after_minutes = end_minutes - boundary_minutes
+    
+    return minutes_to_hours(before_minutes), minutes_to_hours(after_minutes)
+
+
+def calculate_overtime_day_night_split(start: time, end: time) -> Tuple[float, float]:
+    """
+    Calculate hours in overtime day period (06:00-18:00) vs night period (18:00-06:00).
+    
+    For simplicity, this assumes work doesn't span midnight. Work spanning midnight
+    would need more complex handling.
+    
+    Args:
+        start: Start time of the work period
+        end: End time of the work period
+        
+    Returns:
+        Tuple of (hours_in_day_period, hours_in_night_period)
+    """
+    start_minutes = time_to_minutes(start)
+    end_minutes = time_to_minutes(end)
+    
+    # Handle case where end is before start
+    if end_minutes <= start_minutes:
+        return 0.0, 0.0
+    
+    total_minutes = end_minutes - start_minutes
+    day_start_minutes = time_to_minutes(OT_DAY_START)
+    day_end_minutes = time_to_minutes(OT_DAY_END)
+    
+    # Calculate overlap with day period (06:00-18:00)
+    day_overlap_start = max(start_minutes, day_start_minutes)
+    day_overlap_end = min(end_minutes, day_end_minutes)
+    
+    if day_overlap_end > day_overlap_start:
+        day_minutes = day_overlap_end - day_overlap_start
+    else:
+        day_minutes = 0
+    
+    night_minutes = total_minutes - day_minutes
+    
+    return minutes_to_hours(day_minutes), minutes_to_hours(night_minutes)
+
+
+def calculate_sunday_noon_split(start: time, end: time) -> Tuple[float, float]:
+    """
+    Calculate hours before and after noon (12:00) for Sunday work.
+    
+    Args:
+        start: Start time of the work period
+        end: End time of the work period
+        
+    Returns:
+        Tuple of (hours_before_noon, hours_after_noon)
+    """
+    return split_time_by_boundary(start, end, SUNDAY_NOON)

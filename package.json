@@ -1,0 +1,13 @@
+{
+  "name": "lkservice",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:preview": "cd frontend && npm run preview",
+    "backend:dev": "cd app && uvicorn main:app --reload",
+    "dev": "echo Run 'npm run frontend:dev' and 'npm run backend:dev' in separate terminals"
+  },
+  "description": "Time Registration CSV Parser with React frontend and FastAPI backend"
+}

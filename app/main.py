@@ -1,14 +1,13 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from app.routers import upload
 
-# Get the directory where templates are stored
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATES_DIR = BASE_DIR / "templates"
+# Get the base directory
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
 app = FastAPI(
     title="Time Registration CSV Parser",
@@ -19,14 +18,22 @@ app = FastAPI(
 # Include routers
 app.include_router(upload.router)
 
-# Setup templates
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Render the main upload page."""
-    return templates.TemplateResponse("index.html", {"request": request})
+# Mount static files from the built frontend (only if dist exists)
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+    
+    @app.get("/", response_class=FileResponse)
+    async def home():
+        """Serve the React app."""
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+else:
+    @app.get("/")
+    async def home():
+        """Development message when frontend is not built."""
+        return {
+            "message": "Frontend not built yet. Run 'cd frontend && npm run build' to build the frontend.",
+            "dev_server": "For development, run 'cd frontend && npm run dev' in a separate terminal."
+        }
 
 
 @app.get("/health")

@@ -1,0 +1,47 @@
+.file-list {
+    margin-top: 1rem;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 0.4rem;
+    animation: slideIn 0.3s ease-out;
+}
+
+.file-item-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.file-icon {
+    color: var(--accent-secondary);
+}
+
+.file-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.file-size {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.remove-file {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.remove-file:hover {
+    color: var(--error);
+}

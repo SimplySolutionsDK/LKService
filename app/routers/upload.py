@@ -8,9 +8,16 @@ from datetime import datetime
 from app.models.schemas import EmployeeType, ProcessingResult, DailyOutput, WeeklySummary
 from app.services.csv_parser import parse_csv_file
 from app.services.time_calculator import process_records_with_segments
-from app.services.overtime_calculator import process_all_records
-from app.services.csv_generator import generate_daily_csv, generate_weekly_summary_csv, generate_combined_csv
+from app.services.overtime_calculator import process_all_records, apply_credited_hours
+from app.services.csv_generator import (
+    generate_daily_csv, 
+    generate_weekly_summary_csv, 
+    generate_combined_csv,
+    generate_detailed_daily_csv,
+    generate_detailed_weekly_summary_csv
+)
 from app.services.call_out_detector import mark_call_out_eligibility, get_call_out_eligible_days, apply_call_out_payment
+from app.services.absence_detector import mark_absence_types
 
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -66,6 +73,12 @@ async def upload_csv_files(
         
         # Calculate time segments
         all_records = process_records_with_segments(all_records)
+        
+        # Detect and mark absence types (vacation/sick/holiday)
+        all_records = mark_absence_types(all_records)
+        
+        # Apply credited hours for vacation/sick/holiday
+        all_records = apply_credited_hours(all_records)
         
         # Calculate overtime
         summaries, outputs = process_all_records(all_records, emp_type)
@@ -133,6 +146,12 @@ async def preview_data(
         
         # Mark call out eligibility
         all_records = mark_call_out_eligibility(all_records)
+        
+        # Detect and mark absence types (vacation/sick/holiday)
+        all_records = mark_absence_types(all_records)
+        
+        # Apply credited hours for vacation/sick/holiday
+        all_records = apply_credited_hours(all_records)
         
         # Calculate overtime
         summaries, outputs = process_all_records(all_records, emp_type)
@@ -227,9 +246,15 @@ async def export_from_preview(
     if output_format == "weekly":
         csv_content = generate_weekly_summary_csv(summaries)
         filename = "weekly_summary.csv"
+    elif output_format == "weekly_detailed":
+        csv_content = generate_detailed_weekly_summary_csv(summaries)
+        filename = "weekly_summary_detailed.csv"
     elif output_format == "combined":
         csv_content = generate_combined_csv(outputs, summaries)
         filename = "time_registration_combined.csv"
+    elif output_format == "detailed":
+        csv_content = generate_detailed_daily_csv(outputs)
+        filename = "time_registration_detailed.csv"
     else:
         csv_content = generate_daily_csv(outputs)
         filename = "time_registration_daily.csv"
@@ -288,6 +313,12 @@ async def process_and_download(
         # Calculate time segments
         all_records = process_records_with_segments(all_records)
         
+        # Detect and mark absence types (vacation/sick/holiday)
+        all_records = mark_absence_types(all_records)
+        
+        # Apply credited hours for vacation/sick/holiday
+        all_records = apply_credited_hours(all_records)
+        
         # Calculate overtime
         summaries, outputs = process_all_records(all_records, emp_type)
         
@@ -295,9 +326,15 @@ async def process_and_download(
         if output_format == "weekly":
             csv_content = generate_weekly_summary_csv(summaries)
             filename = "weekly_summary.csv"
+        elif output_format == "weekly_detailed":
+            csv_content = generate_detailed_weekly_summary_csv(summaries)
+            filename = "weekly_summary_detailed.csv"
         elif output_format == "combined":
             csv_content = generate_combined_csv(outputs, summaries)
             filename = "time_registration_combined.csv"
+        elif output_format == "detailed":
+            csv_content = generate_detailed_daily_csv(outputs)
+            filename = "time_registration_detailed.csv"
         else:
             csv_content = generate_daily_csv(outputs)
             filename = "time_registration_daily.csv"

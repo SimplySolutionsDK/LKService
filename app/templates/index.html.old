@@ -47,14 +47,16 @@
                 radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
         }
 
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            animation: fadeIn 0.6s ease-out;
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
         }
 
-        .container.preview-active {
+        .container {
+            width: 100%;
             max-width: 1400px;
+            animation: fadeIn 0.6s ease-out;
         }
 
         @keyframes fadeIn {
@@ -71,6 +73,26 @@
         header {
             text-align: center;
             margin-bottom: 2.5rem;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                margin-bottom: 1.5rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .subtitle {
+                font-size: 0.85rem;
+            }
+
+            .logo-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.25rem;
+            }
         }
 
         .logo {
@@ -106,17 +128,19 @@
         }
 
         .upload-section {
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 1.5rem;
         }
 
-        .upload-section.with-preview {
-            grid-template-columns: 380px 1fr;
+        .upload-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
         }
 
-        @media (max-width: 1024px) {
-            .upload-section.with-preview {
+        @media (max-width: 768px) {
+            .upload-controls {
                 grid-template-columns: 1fr;
             }
         }
@@ -126,12 +150,16 @@
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 1.5rem;
-            margin-bottom: 1.5rem;
             transition: border-color 0.3s ease;
+            height: fit-content;
         }
 
         .card:hover {
             border-color: var(--accent-primary);
+        }
+
+        .upload-controls .card {
+            margin-bottom: 0;
         }
 
         .card-title {
@@ -161,6 +189,20 @@
         .dropzone.dragover {
             border-color: var(--accent-primary);
             background: rgba(59, 130, 246, 0.08);
+        }
+
+        @media (max-width: 768px) {
+            .dropzone {
+                padding: 1.5rem 1rem;
+            }
+
+            .dropzone-icon {
+                font-size: 2rem;
+            }
+
+            .dropzone-text {
+                font-size: 0.85rem;
+            }
         }
 
         .dropzone-icon {
@@ -401,6 +443,7 @@
             font-size: 0.8rem;
             color: var(--text-secondary);
             line-height: 1.5;
+            margin-top: 1.5rem;
         }
 
         .info-box strong {
@@ -410,10 +453,13 @@
         /* Preview Section */
         .preview-section {
             display: none;
+            width: 100%;
+            margin-top: 0.5rem;
         }
 
         .preview-section.active {
             display: block;
+            animation: fadeIn 0.4s ease-out;
         }
 
         .preview-card {
@@ -444,6 +490,23 @@
         .preview-tabs {
             display: flex;
             gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .preview-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .preview-tabs {
+                width: 100%;
+            }
+
+            .preview-tab {
+                flex: 1;
+                text-align: center;
+            }
         }
 
         .preview-tab {
@@ -470,12 +533,19 @@
         }
 
         .preview-stats {
-            display: flex;
-            gap: 1.5rem;
-            padding: 0.75rem 1.25rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1.25rem;
+            padding: 1rem 1.25rem;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-color);
-            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .preview-stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
         }
 
         .stat {
@@ -503,14 +573,47 @@
 
         .table-container {
             overflow-x: auto;
-            max-height: 500px;
+            max-height: 600px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) var(--bg-secondary);
+        }
+
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .table-container::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .table-container::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 4px;
+        }
+
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
         }
 
         table {
             width: 100%;
+            min-width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.5rem 0.7rem;
+            }
         }
 
         th, td {
@@ -518,6 +621,27 @@
             text-align: left;
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
+        }
+
+        th:first-child,
+        td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+        }
+
+        th:first-child {
+            background: var(--bg-secondary);
+            z-index: 15;
+        }
+
+        td:first-child {
+            background: var(--bg-card);
+        }
+
+        tr:hover td:first-child {
+            background: rgba(59, 130, 246, 0.05);
         }
 
         th {
@@ -564,21 +688,41 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            flex: 1;
+            min-width: 250px;
         }
 
         .export-format label {
             margin-bottom: 0;
             font-size: 0.85rem;
+            white-space: nowrap;
         }
 
         .export-format select {
-            width: auto;
-            min-width: 180px;
+            flex: 1;
+            min-width: 200px;
         }
 
         .export-btn {
             width: auto;
             padding: 0.65rem 1.5rem;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .export-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .export-format {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .export-btn {
+                width: 100%;
+            }
         }
 
         footer {
@@ -758,9 +902,9 @@
         </header>
 
         <div class="upload-section" id="uploadSection">
-            <!-- Left Column: Upload Form -->
-            <div class="upload-column">
-                <form id="uploadForm" enctype="multipart/form-data">
+            <!-- Upload Controls -->
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="upload-controls">
                     <div class="card">
                         <h2 class="card-title">
                             <span class="card-title-icon">📁</span>
@@ -795,28 +939,28 @@
                                 <option value="Elev">Elev (Handels/Kontor)</option>
                             </select>
                         </div>
-                    </div>
 
-                    <div class="card">
-                        <button type="submit" class="btn btn-primary" id="previewBtn" disabled>
+                        <button type="submit" class="btn btn-primary" id="previewBtn" disabled style="margin-top: 1rem;">
                             <span>👁</span>
                             Vis Preview
                         </button>
                         
                         <div class="status" id="status"></div>
                     </div>
+                </div>
 
-                    <div class="info-box">
-                        <strong>Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br>
-                        • Normtid: 37 timer ugentligt, 07:00-17:00 på hverdage<br>
-                        • Overtid 1: Første 3 timer over 37 timer (+35% for svende)<br>
-                        • Overtid 2: Timer udover de første 3 overtimer (+100%)<br>
-                        • Overtid 3: Søndags- og helligdagsarbejde (+100%)
-                    </div>
-                </form>
-            </div>
+                <div class="info-box">
+                    <strong>Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br>
+                    • Normtid: 37 timer ugentligt<br>
+                    • Hverdage: Timer-tærskel (1./2., 3./4., 5.+ time) + tid-på-dagen (06-18 / 18-06)<br>
+                    • Lørdag: Anvendes fridag-satser (dag: 76,80 kr, nat: 143,70 kr)<br>
+                    • Søndag: Før kl. 12 (95,75 kr), efter kl. 12 (143,70 kr)<br>
+                    • Call-out: 750 kr ved arbejde før 07:00 eller fra 15:30<br>
+                    <small>Satser gældende fra 1. marts 2026</small>
+                </div>
+            </form>
 
-            <!-- Right Column: Preview -->
+            <!-- Preview Section (Full Width) -->
             <div class="preview-section" id="previewSection">
                 <div class="preview-card">
                     <div class="preview-header">
@@ -876,8 +1020,10 @@
                         <div class="export-format">
                             <label for="outputFormat">Eksport format:</label>
                             <select id="outputFormat" name="output_format">
-                                <option value="daily" selected>Daglig oversigt</option>
+                                <option value="daily" selected>Daglig oversigt (standard)</option>
+                                <option value="detailed">Daglig oversigt (detaljeret DBR 2026)</option>
                                 <option value="weekly">Ugentlig opsummering</option>
+                                <option value="weekly_detailed">Ugentlig opsummering (detaljeret)</option>
                                 <option value="combined">Kombineret (begge)</option>
                             </select>
                         </div>
@@ -1024,14 +1170,10 @@
 
         function showPreview() {
             previewSection.classList.add('active');
-            uploadSection.classList.add('with-preview');
-            mainContainer.classList.add('preview-active');
         }
 
         function hidePreview() {
             previewSection.classList.remove('active');
-            uploadSection.classList.remove('with-preview');
-            mainContainer.classList.remove('preview-active');
             previewData = null;
             sessionId = null;
             callOutSelections = {};
@@ -1050,14 +1192,12 @@
                     <th>Dag</th>
                     <th>Type</th>
                     <th>Total</th>
-                    <th>Normtid</th>
-                    <th>Udenfor</th>
-                    <th>Uge</th>
-                    <th>Uge Total</th>
                     <th>Normal</th>
-                    <th>OT1</th>
-                    <th>OT2</th>
-                    <th>OT3</th>
+                    <th title="Hverdage: 1. & 2. overtidstime (48,10 kr)">OT Hvd 1-2</th>
+                    <th title="Hverdage: 3. & 4. overtidstime (76,80 kr)">OT Hvd 3-4</th>
+                    <th title="Hverdage: 5.+ overtidstime (143,70 kr)">OT Hvd 5+</th>
+                    <th title="Lørdag timer (dag: 76,80 kr, nat: 143,70 kr)">OT Lør</th>
+                    <th title="Søndag timer (før 12: 95,75 kr, efter 12: 143,70 kr)">OT Søn</th>
                     <th title="Call Out betaling (750 kr) for vagter der starter før 07:00 eller efter 15:30">Call Out 🕐</th>
                     <th>Detaljer</th>
                 </tr>
@@ -1075,6 +1215,11 @@
                        <span class="call-out-indicator" title="Kvalificerer til Call Out betaling">⏰</span>`
                     : `<input type="checkbox" class="call-out-checkbox" disabled title="Ingen registreringer udenfor normal tid">`;
 
+                const otb = row.overtime_breakdown || {};
+                const ot_hvd_total = (otb.ot_weekday_hour_1_2 || 0) + (otb.ot_weekday_hour_3_4 || 0) + (otb.ot_weekday_hour_5_plus || 0);
+                const ot_lor_total = (otb.ot_saturday_day || 0) + (otb.ot_saturday_night || 0);
+                const ot_son_total = (otb.ot_sunday_before_noon || 0) + (otb.ot_sunday_after_noon || 0);
+                
                 return `
                     <tr class="${rowClass}">
                         <td>${row.worker}</td>
@@ -1082,14 +1227,12 @@
                         <td>${row.day}</td>
                         <td>${row.day_type}</td>
                         <td class="number">${row.total_hours.toFixed(2)}</td>
-                        <td class="number">${row.hours_norm_time.toFixed(2)}</td>
-                        <td class="number">${row.hours_outside_norm.toFixed(2)}</td>
-                        <td class="number">${row.week_number}</td>
-                        <td class="number">${row.weekly_total.toFixed(2)}</td>
                         <td class="number">${row.normal_hours.toFixed(2)}</td>
-                        <td class="number ${row.overtime_1 > 0 ? 'overtime1' : ''}">${row.overtime_1.toFixed(2)}</td>
-                        <td class="number ${row.overtime_2 > 0 ? 'overtime2' : ''}">${row.overtime_2.toFixed(2)}</td>
-                        <td class="number ${row.overtime_3 > 0 ? 'overtime3' : ''}">${row.overtime_3.toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_1_2 || 0) > 0 ? 'overtime1' : ''}">${(otb.ot_weekday_hour_1_2 || 0).toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_3_4 || 0) > 0 ? 'overtime2' : ''}">${(otb.ot_weekday_hour_3_4 || 0).toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_5_plus || 0) > 0 ? 'overtime3' : ''}">${(otb.ot_weekday_hour_5_plus || 0).toFixed(2)}</td>
+                        <td class="number ${ot_lor_total > 0 ? 'overtime2' : ''}">${ot_lor_total.toFixed(2)}</td>
+                        <td class="number ${ot_son_total > 0 ? 'overtime3' : ''}">${ot_son_total.toFixed(2)}</td>
                         <td class="call-out-cell">${checkboxHtml}</td>
                         <td class="details-cell">
                             <button class="details-btn" onclick="openEntriesModal(${index})" title="Vis tidsregistreringer">
@@ -1109,24 +1252,34 @@
                     <th>Uge</th>
                     <th>Total Timer</th>
                     <th>Normal Timer</th>
-                    <th>Overtid 1</th>
-                    <th>Overtid 2</th>
-                    <th>Overtid 3</th>
+                    <th title="Hverdage: 1. & 2. overtidstime">OT Hvd 1-2</th>
+                    <th title="Hverdage: 3. & 4. overtidstime">OT Hvd 3-4</th>
+                    <th title="Hverdage: 5.+ overtidstime">OT Hvd 5+</th>
+                    <th title="Lørdag timer">OT Lør</th>
+                    <th title="Søndag timer">OT Søn</th>
                 </tr>
             `;
 
-            tableBody.innerHTML = data.map(row => `
-                <tr>
-                    <td>${row.worker_name}</td>
-                    <td class="number">${row.year}</td>
-                    <td class="number">${row.week_number}</td>
-                    <td class="number">${row.total_hours.toFixed(2)}</td>
-                    <td class="number">${row.normal_hours.toFixed(2)}</td>
-                    <td class="number ${row.overtime_1 > 0 ? 'overtime1' : ''}">${row.overtime_1.toFixed(2)}</td>
-                    <td class="number ${row.overtime_2 > 0 ? 'overtime2' : ''}">${row.overtime_2.toFixed(2)}</td>
-                    <td class="number ${row.overtime_3 > 0 ? 'overtime3' : ''}">${row.overtime_3.toFixed(2)}</td>
-                </tr>
-            `).join('');
+            tableBody.innerHTML = data.map(row => {
+                const otb = row.overtime_breakdown || {};
+                const ot_lor_total = (otb.ot_saturday_day || 0) + (otb.ot_saturday_night || 0);
+                const ot_son_total = (otb.ot_sunday_before_noon || 0) + (otb.ot_sunday_after_noon || 0);
+                
+                return `
+                    <tr>
+                        <td>${row.worker_name}</td>
+                        <td class="number">${row.year}</td>
+                        <td class="number">${row.week_number}</td>
+                        <td class="number">${row.total_hours.toFixed(2)}</td>
+                        <td class="number">${row.normal_hours.toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_1_2 || 0) > 0 ? 'overtime1' : ''}">${(otb.ot_weekday_hour_1_2 || 0).toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_3_4 || 0) > 0 ? 'overtime2' : ''}">${(otb.ot_weekday_hour_3_4 || 0).toFixed(2)}</td>
+                        <td class="number ${(otb.ot_weekday_hour_5_plus || 0) > 0 ? 'overtime3' : ''}">${(otb.ot_weekday_hour_5_plus || 0).toFixed(2)}</td>
+                        <td class="number ${ot_lor_total > 0 ? 'overtime2' : ''}">${ot_lor_total.toFixed(2)}</td>
+                        <td class="number ${ot_son_total > 0 ? 'overtime3' : ''}">${ot_son_total.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function updateStats(data) {
@@ -1139,9 +1292,14 @@
             weekly.forEach(w => {
                 totalHours += w.total_hours;
                 normalHours += w.normal_hours;
-                ot1 += w.overtime_1;
-                ot2 += w.overtime_2;
-                ot3 += w.overtime_3;
+                // Use new breakdown if available, fall back to legacy
+                const otb = w.overtime_breakdown || {};
+                ot1 += (otb.ot_weekday_hour_1_2 || w.overtime_1 || 0);
+                ot2 += (otb.ot_weekday_hour_3_4 || w.overtime_2 || 0);
+                ot3 += ((otb.ot_weekday_hour_5_plus || 0) + 
+                        (otb.ot_saturday_day || 0) + (otb.ot_saturday_night || 0) +
+                        (otb.ot_sunday_before_noon || 0) + (otb.ot_sunday_after_noon || 0) || 
+                        w.overtime_3 || 0);
             });
 
             document.getElementById('statTotal').textContent = totalHours.toFixed(2);
@@ -1285,6 +1443,14 @@
                     showPreview();
                     hideStatus();
                     showStatus('success', `✓ ${result.total_records} registreringer behandlet fra ${selectedFiles.length} fil(er)`);
+                    
+                    // Scroll to the preview section
+                    setTimeout(() => {
+                        const previewCard = document.querySelector('.preview-card');
+                        if (previewCard) {
+                            previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 100);
                 } else {
                     showStatus('error', `✕ Fejl: ${result.detail || 'Ukendt fejl'}`);
                 }

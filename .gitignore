@@ -210,3 +210,8 @@ Data/TimeRegViewRep (1).csv
 Data/TimeRegViewRep (2).csv
 Data/TimeRegViewRep (3).csv
 Data/TimeRegViewRep.csv
+
+# Frontend (Node.js / React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
