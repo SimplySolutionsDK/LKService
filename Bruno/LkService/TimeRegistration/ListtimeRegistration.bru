@@ -1,0 +1,27 @@
+meta {
+  name: ListtimeRegistration
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{TimeURL}}timeRegistration?EmployeeIds=44654&SortOrder=Descending&ShowOnlyCompleted=true&StartTimeUtc=2026-02-04T00:00:00Z&EndTimeUtc=2026-02-04T23:59:59Z
+  body: none
+  auth: inherit
+}
+
+params:query {
+  EmployeeIds: 44654
+  SortOrder: Descending
+  ShowOnlyCompleted: true
+  StartTimeUtc: 2026-02-04T00:00:00Z
+  EndTimeUtc: 2026-02-04T23:59:59Z
+  ~PageNumber: 1
+  ~PageSize: 10
+  ~SortBy: StartTimeUtc
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

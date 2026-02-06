@@ -7,7 +7,8 @@ import type {
   AbsenceSelections,
   AbsenceType,
   StatusMessage, 
-  EmployeeType 
+  EmployeeType,
+  ApiFetchParams
 } from '../types';
 import { api } from '../services/api';
 
@@ -117,6 +118,37 @@ export const usePreview = () => {
     }
   }, [absenceSelections, previewData]);
 
+  const loadPreviewFromApi = useCallback(async (params: ApiFetchParams, employeeType: EmployeeType) => {
+    setIsLoading(true);
+    setStatus({ type: 'loading', message: 'Henter data fra API...' });
+
+    try {
+      const data = await api.fetchTimeRegistrations(params, employeeType);
+      setPreviewData(data);
+      setCallOutSelections({});
+      setAbsenceSelections({});
+      setStatus({
+        type: 'success',
+        message: `✓ ${data.total_records} registreringer hentet for ${params.employeeName}`,
+      });
+      
+      // Scroll to preview after a short delay
+      setTimeout(() => {
+        const previewCard = document.querySelector('.preview-card');
+        if (previewCard) {
+          previewCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: `✕ Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const clearPreview = useCallback(() => {
     setPreviewData(null);
     setCallOutSelections({});
@@ -135,6 +167,7 @@ export const usePreview = () => {
     setActiveTab,
     setOutputFormat,
     loadPreview,
+    loadPreviewFromApi,
     exportData,
     updateCallOutSelection,
     updateAbsenceSelection,

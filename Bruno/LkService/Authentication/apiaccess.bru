@@ -1,0 +1,48 @@
+meta {
+  name: apiaccess
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{CoreURL}}Authentication/apiaccess
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  ~Ocp-Apim-Subscription-Key: {{Ocp-Apim-Subscription-Key}}
+}
+
+body:json {
+  {
+  "key": "67ae1d66-a34a-480f-b2fd-0c58c02821b5"
+  }
+}
+
+vars:pre-request {
+  baseURL: CoreURL
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response?.token) {
+    bru.setEnvVar("token", response.token);
+  
+    // Store expiry info for pre-script validation
+    if (response.validTo) bru.setEnvVar("tokenValidTo", response.validTo);
+    if (response.expiresIn != null) bru.setEnvVar("tokenExpiresIn", String(response.expiresIn));
+  
+    console.log("Token + expiry stored");
+  } else {
+    throw new Error("No token in apiAccess response");
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

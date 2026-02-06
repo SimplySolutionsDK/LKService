@@ -3,11 +3,12 @@ import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { UploadCard } from './components/upload/UploadCard';
 import { SettingsCard } from './components/upload/SettingsCard';
+import { ApiFetchCard } from './components/api-fetch/ApiFetchCard';
 import { PreviewSection } from './components/preview/PreviewSection';
 import { EntriesModal } from './components/modals/EntriesModal';
 import { useFileUpload } from './hooks/useFileUpload';
 import { usePreview } from './hooks/usePreview';
-import type { EmployeeType, DailyRecord } from './types';
+import type { EmployeeType, DailyRecord, ApiFetchParams } from './types';
 import './App.css';
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
     setActiveTab,
     setOutputFormat,
     loadPreview,
+    loadPreviewFromApi,
     exportData,
     updateCallOutSelection,
     updateAbsenceSelection,
@@ -46,6 +48,14 @@ function App() {
   const handlePreview = async () => {
     if (files.length === 0) return;
     await loadPreview(files, employeeType);
+  };
+
+  const handleApiFetchedData = async (params: ApiFetchParams) => {
+    // Clear any uploaded CSV files when using API fetch
+    if (files.length > 0) {
+      files.forEach((_, index) => removeFile(index));
+    }
+    await loadPreviewFromApi(params, employeeType);
   };
 
   const handleShowDetails = (index: number) => {
@@ -79,6 +89,14 @@ function App() {
               onPreview={handlePreview}
               previewDisabled={files.length === 0 || isLoading}
               status={status}
+            />
+          </div>
+
+          <div className="api-fetch-section">
+            <ApiFetchCard
+              onDataFetched={handleApiFetchedData}
+              employeeType={employeeType}
+              isLoading={isLoading}
             />
           </div>
 

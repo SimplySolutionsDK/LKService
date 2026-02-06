@@ -1,0 +1,8 @@
+﻿# API Configuration
+# Copy this file to .env.local and fill in your actual API endpoints
+
+# Core API URL for employee search
+VITE_CORE_API_URL=https://apigw.ftzplus.dk/external/coreapi/api/
+
+# Time Registration API URL
+VITE_TIME_API_URL=https://apigw.ftzplus.dk/external/timeregistrationapi/api/

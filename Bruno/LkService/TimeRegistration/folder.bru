@@ -1,0 +1,56 @@
+meta {
+  name: TimeRegistration
+}
+
+auth {
+  mode: inherit
+}
+
+script:pre-request {
+  const token = bru.getEnvVar("token");
+  const validToRaw = bru.getEnvVar("tokenValidTo");
+  
+  // Refresh if token missing/empty
+  let shouldRefresh = !token || token.trim() === "";
+  
+  // Refresh if we don't know expiry (validTo missing)
+  if (!shouldRefresh && (!validToRaw || validToRaw.trim() === "")) {
+    shouldRefresh = true;
+  }
+  
+  // Refresh if expired or about to expire (buffer)
+  if (!shouldRefresh) {
+    const validTo = new Date(validToRaw);
+    if (isNaN(validTo.getTime())) {
+      // invalid date in env var -> refresh
+      shouldRefresh = true;
+    } else {
+      const bufferSeconds = 60; // refresh 60s before expiry
+      const now = new Date();
+      const expiresSoon = (validTo.getTime() - now.getTime()) <= bufferSeconds * 1000;
+  
+      if (expiresSoon) {
+        shouldRefresh = true;
+      }
+    }
+  }
+  
+  if (shouldRefresh) {
+    console.log("Token missing/expired – running apiAccess request");
+    await bru.runRequest("apiAccess");
+  
+    const newToken = bru.getEnvVar("token");
+    const newValidTo = bru.getEnvVar("tokenValidTo");
+  
+    if (!newToken || newToken.trim() === "") {
+      throw new Error("Authentication failed: token still missing after apiAccess");
+    }
+  
+    if (!newValidTo || isNaN(new Date(newValidTo).getTime())) {
+      console.warn("Warning: tokenValidTo missing/invalid after apiAccess (expiry check may be unreliable)");
+    }
+  
+    console.log("Token refreshed successfully");
+  }
+  
+}

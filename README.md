@@ -52,12 +52,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install Python dependencies
 pip install -r requirements.txt
+
+# Configure API credentials
+cp .env.example .env
+# Edit .env with your actual API credentials
 ```
 
 3. **Frontend Setup**:
 ```bash
 # Navigate to frontend directory
 cd frontend
+
+# Copy environment template and configure API endpoints
+cp .env.example .env.local
+# Edit .env.local with your actual API URLs
 
 # Install Node.js dependencies
 npm install
@@ -69,6 +77,56 @@ npm run build
 cd ..
 ```
 
+### API Configuration
+
+The application supports fetching time registration data directly from external APIs as an alternative to CSV uploads.
+
+**Backend Configuration (Required):**
+
+1. **Copy the environment template** in the project root:
+```bash
+cp .env.example .env
+```
+
+2. **Edit `.env`** with your actual API credentials:
+```bash
+# External API Configuration
+CORE_API_URL=https://apigw.ftzplus.dk/external/coreapi/api/
+TIME_API_URL=https://apigw.ftzplus.dk/external/timeregistrationapi/api/
+
+# API Authentication Key (from your API provider)
+API_AUTH_KEY=your-actual-api-key-here
+
+# Azure API Management Subscription Key (if required)
+APIM_SUBSCRIPTION_KEY=your-subscription-key-here
+```
+
+3. **Restart the backend** to apply changes:
+```bash
+cd app
+uvicorn main:app --reload
+```
+
+**Frontend Configuration (Optional):**
+
+The frontend uses the Vite proxy to communicate with the backend, so no frontend configuration is needed for API access. However, you can customize the API URLs displayed in the UI by creating `frontend/.env.local`:
+
+```bash
+cd frontend
+cp .env.example .env.local
+# Edit .env.local if needed (optional)
+npm run build  # Required after changes
+```
+
+**Authentication Flow:**
+
+The backend automatically handles authentication with the external APIs:
+1. Requests a bearer token from the authentication endpoint using your API_AUTH_KEY
+2. Caches the token and refreshes it before expiry
+3. Adds required headers (Authorization, Ocp-Apim-Subscription-Key) to all API requests
+
+No manual token management is required.
+
 ### Running Locally
 
 #### Development Mode
@@ -77,9 +135,11 @@ For active development, run both the backend and frontend in separate terminals:
 
 **Terminal 1 - Backend:**
 ```bash
-# From project root
-cd app
-uvicorn main:app --reload
+# From project root (not from inside app directory)
+python -m uvicorn app.main:app --reload
+
+# Or on Windows with venv:
+.\venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
 **Terminal 2 - Frontend:**
@@ -102,9 +162,9 @@ npm run build
 cd ..
 ```
 
-2. Start the backend server:
+2. Start the backend server (from project root):
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 The application will be available at `http://localhost:8000` serving the built React app.

@@ -67,3 +67,66 @@ export interface StatusMessage {
   type: 'success' | 'error' | 'loading';
   message: string;
 }
+
+// Employee API response types
+export interface SecondaryDepartment {
+  branchDepartmentId: number;
+  branchOfficeId: number;
+  name: string;
+  usesOfficeHours: boolean;
+}
+
+export interface Employee {
+  employeeId: number;
+  number: number;
+  firstname: string;
+  lastname: string;
+  telephone: string;
+  barCode: string;
+  hourPay: number;
+  payLineProductNo: string;
+  payLineProductText: string;
+  payLineCategoryNo: string;
+  payLineUnit: string;
+  deleted: boolean;
+  hideOnPlanner: boolean;
+  branchDepartmentId: number;
+  nameInitials: string;
+  onlineBookingAllowed: boolean;
+  secondaryDepartments: SecondaryDepartment[];
+  plannerSortOrder: number;
+}
+
+export interface EmployeeSearchResponse {
+  totalCount: number;
+  results: Employee[];
+}
+
+// Time Registration API response types
+export interface TimeRegistration {
+  timeRegistrationId: number;
+  employeeId: number;
+  caseId: number;
+  caseNo: number;
+  registrationTypeId: number;
+  plannerAppointmentId: number | null;
+  comments: string | null;
+  isUpdated: boolean;
+  startTimeUtc: string;
+  endTimeUtc: string;
+  elapsedMinutes: number;
+  elapsedHours: number;
+}
+
+export interface TimeRegistrationResponse {
+  totalCount: number;
+  results: TimeRegistration[];
+}
+
+// API fetch params
+export interface ApiFetchParams {
+  employeeId: number;
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+}

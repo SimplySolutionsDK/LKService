@@ -2,8 +2,19 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from dotenv import load_dotenv
+import logging
 
-from app.routers import upload
+from app.routers import upload, api_fetch
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Get the base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +28,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(upload.router)
+app.include_router(api_fetch.router)
 
 # Mount static files from the built frontend (only if dist exists)
 if FRONTEND_DIST.exists():
