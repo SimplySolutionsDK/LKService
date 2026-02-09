@@ -31,10 +31,13 @@ export const EmployeeSelect: React.FC<EmployeeSelectProps> = ({
   };
 
   return (
-    <div className="employee-select-group">
-      <label htmlFor="employee-select">Vælg Medarbejder:</label>
+    <div className="flex flex-col gap-2">
+      <label htmlFor="employee-select" className="font-medium text-slate-100 text-[0.9rem]">
+        Vælg Medarbejder:
+      </label>
       <select
         id="employee-select"
+        className="py-2.5 px-2.5 border border-border rounded bg-bg-primary text-slate-100 text-[0.9rem] cursor-pointer transition-colors select-arrow hover:enabled:border-accent focus:outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)] disabled:bg-bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
         value={selectedEmployeeId || ''}
         onChange={handleChange}
         disabled={disabled || isLoading}
@@ -55,7 +58,7 @@ export const EmployeeSelect: React.FC<EmployeeSelectProps> = ({
         })}
       </select>
       {employees.length > 0 && (
-        <small className="employee-count">
+        <small className="text-slate-400 text-[0.8rem]">
           {employees.length} medarbejder{employees.length !== 1 ? 'e' : ''} tilgængelig{employees.length !== 1 ? 'e' : ''}
         </small>
       )}

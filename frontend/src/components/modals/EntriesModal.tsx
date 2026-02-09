@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
 import type { DailyRecord } from '../../types';
-import './EntriesModal.css';
 
 interface EntriesModalProps {
   isOpen: boolean;
   record: DailyRecord | null;
   onClose: () => void;
 }
+
+const MTH = 'bg-bg-secondary py-3 px-4 text-left font-semibold text-slate-400 border-b border-border sticky top-0';
+const MTD = 'py-3 px-4 border-b border-border text-slate-100';
 
 export const EntriesModal: React.FC<EntriesModalProps> = ({ isOpen, record, onClose }) => {
   useEffect(() => {
@@ -38,35 +40,46 @@ export const EntriesModal: React.FC<EntriesModalProps> = ({ isOpen, record, onCl
   });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">
+    <div
+      className="fixed inset-0 bg-black/75 backdrop-blur-[4px] flex items-center justify-center z-[1000] animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-bg-card border border-border rounded-2xl w-[90%] max-w-[700px] max-h-[80vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="py-5 px-6 border-b border-border flex items-center justify-between">
+          <h3 className="text-[1.1rem] font-semibold text-slate-100 m-0">
             Tidsregistreringer - {record.worker} - {record.date}
           </h3>
-          <button className="modal-close" onClick={onClose}>
+          <button
+            className="bg-transparent border-none text-slate-500 text-2xl cursor-pointer py-1 px-2 leading-none transition-colors hover:text-red-500"
+            onClick={onClose}
+          >
             ✕
           </button>
         </div>
-        <div className="modal-body">
-          <table className="modal-table">
+        <div className="p-6 overflow-y-auto flex-1">
+          <table className="w-full border-collapse text-[0.9rem]">
             <thead>
               <tr>
-                <th>Sag Nr</th>
-                <th>Start</th>
-                <th>Slut</th>
-                <th>Timer</th>
+                <th className={MTH}>Sag Nr</th>
+                <th className={MTH}>Start</th>
+                <th className={MTH}>Slut</th>
+                <th className={MTH}>Timer</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry, index) => {
                 const displayText = entry.case_number || entry.activity;
                 return (
-                  <tr key={index}>
-                    <td>{displayText}</td>
-                    <td>{entry.start_time}</td>
-                    <td>{entry.end_time}</td>
-                    <td className="number">{entry.total_hours.toFixed(2)}</td>
+                  <tr key={index} className="last:*:border-b-0 hover:*:bg-blue-500/5">
+                    <td className={MTD}>{displayText}</td>
+                    <td className={MTD}>{entry.start_time}</td>
+                    <td className={MTD}>{entry.end_time}</td>
+                    <td className={`${MTD} text-right [font-variant-numeric:tabular-nums]`}>
+                      {entry.total_hours.toFixed(2)}
+                    </td>
                   </tr>
                 );
               })}

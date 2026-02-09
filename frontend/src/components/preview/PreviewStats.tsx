@@ -1,6 +1,5 @@
 import React from 'react';
 import type { PreviewData, CallOutSelections } from '../../types';
-import './PreviewStats.css';
 
 interface PreviewStatsProps {
   data: PreviewData;
@@ -32,40 +31,27 @@ export const PreviewStats: React.FC<PreviewStatsProps> = ({ data, callOutSelecti
     }
   });
 
+  const stats = [
+    { label: 'Registreringer', value: daily.length.toString() },
+    { label: 'Total Timer', value: totalHours.toFixed(2) },
+    { label: 'Normal', value: normalHours.toFixed(2) },
+    { label: 'Overtid 1', value: ot1.toFixed(2), color: 'text-ot1' },
+    { label: 'Overtid 2', value: ot2.toFixed(2), color: 'text-ot2' },
+    { label: 'Overtid 3', value: ot3.toFixed(2), color: 'text-ot3' },
+    { label: 'Call Out Dage', value: `${callOutSelectedCount}/${callOutQualifyingDays}`, color: 'text-amber-500' },
+    { label: 'Call Out Betaling', value: `${callOutSelectedCount * 750} kr`, color: 'text-amber-500' },
+  ];
+
   return (
-    <div className="preview-stats">
-      <div className="stat">
-        <span className="stat-label">Registreringer</span>
-        <span className="stat-value">{daily.length}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Total Timer</span>
-        <span className="stat-value">{totalHours.toFixed(2)}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Normal</span>
-        <span className="stat-value">{normalHours.toFixed(2)}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Overtid 1</span>
-        <span className="stat-value overtime1">{ot1.toFixed(2)}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Overtid 2</span>
-        <span className="stat-value overtime2">{ot2.toFixed(2)}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Overtid 3</span>
-        <span className="stat-value overtime3">{ot3.toFixed(2)}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Call Out Dage</span>
-        <span className="stat-value call-out">{callOutSelectedCount}/{callOutQualifyingDays}</span>
-      </div>
-      <div className="stat">
-        <span className="stat-label">Call Out Betaling</span>
-        <span className="stat-value call-out">{callOutSelectedCount * 750} kr</span>
-      </div>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-5 p-4 px-5 bg-bg-secondary border-b border-border max-md:grid-cols-2 max-md:gap-4">
+      {stats.map((stat) => (
+        <div key={stat.label} className="flex flex-col gap-0.5">
+          <span className="text-xs text-slate-500 uppercase tracking-wider">{stat.label}</span>
+          <span className={`text-[1.1rem] font-semibold ${stat.color ?? 'text-slate-100'}`}>
+            {stat.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 };

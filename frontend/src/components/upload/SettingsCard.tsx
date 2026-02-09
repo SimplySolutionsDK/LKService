@@ -4,7 +4,6 @@ import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import { Status } from '../ui/Status';
 import type { EmployeeType, StatusMessage } from '../../types';
-import './SettingsCard.css';
 
 interface SettingsCardProps {
   employeeType: EmployeeType;
@@ -31,7 +30,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   return (
     <Card>
       <CardTitle icon="⚙️">Indstillinger</CardTitle>
-      
+
       <Select
         label="Medarbejdertype"
         value={employeeType}
@@ -43,7 +42,7 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
         variant="primary"
         onClick={onPreview}
         disabled={previewDisabled}
-        style={{ marginTop: '1rem' }}
+        className="mt-4"
       >
         <span>👁</span>
         Vis Preview

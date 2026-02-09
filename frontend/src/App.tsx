@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import clsx from 'clsx';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { UploadCard } from './components/upload/UploadCard';
@@ -10,9 +11,10 @@ import { Status } from './components/ui/Status';
 import { useFileUpload } from './hooks/useFileUpload';
 import { usePreview } from './hooks/usePreview';
 import type { EmployeeType, DailyRecord, ApiFetchParams } from './types';
-import './App.css';
 
 type DataSource = 'api' | 'csv';
+
+const tabBase = 'flex-1 py-3 px-6 bg-transparent border-none rounded-lg text-[0.95rem] font-medium cursor-pointer transition-all flex items-center justify-center gap-2 max-md:w-full';
 
 function App() {
   const { files, addFiles, removeFile } = useFileUpload();
@@ -75,24 +77,30 @@ function App() {
   };
 
   return (
-    <div className="container">
+    <div className="w-full max-w-[1400px] animate-fade-in">
       <Header 
         employeeType={employeeType}
         onEmployeeTypeChange={setEmployeeType}
       />
 
-      <div className="upload-section">
-        <div className="tab-switcher">
+      <div className="flex flex-col gap-6">
+        <div className="flex gap-3 mb-6 bg-bg-secondary p-2 rounded-xl border border-border max-md:flex-col max-md:gap-2">
           <button
             type="button"
-            className={`tab-button ${dataSource === 'api' ? 'active' : ''}`}
+            className={clsx(tabBase, dataSource === 'api'
+              ? 'bg-accent text-white shadow-[0_4px_12px_var(--color-accent-glow)]'
+              : 'text-slate-400 hover:bg-bg-card hover:text-slate-100'
+            )}
             onClick={() => setDataSource('api')}
           >
             🔍 Hent fra API
           </button>
           <button
             type="button"
-            className={`tab-button ${dataSource === 'csv' ? 'active' : ''}`}
+            className={clsx(tabBase, dataSource === 'csv'
+              ? 'bg-accent text-white shadow-[0_4px_12px_var(--color-accent-glow)]'
+              : 'text-slate-400 hover:bg-bg-card hover:text-slate-100'
+            )}
             onClick={() => setDataSource('csv')}
           >
             📁 Upload CSV
@@ -100,7 +108,7 @@ function App() {
         </div>
 
         <form onSubmit={(e) => { e.preventDefault(); handlePreview(); }}>
-          <div className="content-area">
+          <div className="mb-6">
             {dataSource === 'api' ? (
               <ApiFetchCard
                 onDataFetched={handleApiFetchedData}
@@ -108,14 +116,14 @@ function App() {
                 isLoading={isLoading}
               />
             ) : (
-              <div className="csv-upload-section">
+              <div className="flex flex-col gap-6">
                 <UploadCard
                   files={files}
                   onFilesSelected={handleFilesSelected}
                   onFileRemove={handleFileRemove}
                 />
                 
-                <div className="csv-preview-controls">
+                <div className="flex flex-col gap-4">
                   <Button
                     variant="primary"
                     onClick={handlePreview}
@@ -130,8 +138,8 @@ function App() {
             )}
           </div>
 
-          <div className="info-box">
-            <strong>Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br />
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-[10px] py-3.5 px-4 text-[0.8rem] text-slate-400 leading-relaxed mt-6">
+            <strong className="text-accent-light">Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br />
             • Normtid: 37 timer ugentligt<br />
             • Hverdage: Timer-tærskel (1./2., 3./4., 5.+ time) + tid-på-dagen (06-18 / 18-06)<br />
             • Lørdag: Anvendes fridag-satser (dag: 76,80 kr, nat: 143,70 kr)<br />

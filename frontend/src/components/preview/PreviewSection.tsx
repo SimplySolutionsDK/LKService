@@ -5,7 +5,6 @@ import { DailyTable } from './DailyTable';
 import { WeeklyTable } from './WeeklyTable';
 import { ExportBar } from './ExportBar';
 import type { PreviewData, TabType, OutputFormat, CallOutSelections, AbsenceSelections, AbsenceType } from '../../types';
-import './PreviewSection.css';
 
 interface PreviewSectionProps {
   data: PreviewData;
@@ -35,10 +34,10 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
   onExport,
 }) => {
   return (
-    <div className="preview-section active">
-      <div className="preview-card">
-        <div className="preview-header">
-          <h3 className="preview-title">
+    <div className="w-full mt-2 animate-fade-in">
+      <div className="bg-bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="p-4 px-5 border-b border-border flex justify-between items-center flex-wrap gap-4 max-md:flex-col max-md:items-start">
+          <h3 className="text-base font-semibold flex items-center gap-2">
             <span>📊</span>
             Data Forhåndsvisning
           </h3>

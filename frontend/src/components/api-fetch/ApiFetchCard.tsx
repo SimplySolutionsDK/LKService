@@ -5,7 +5,6 @@ import { EmployeeSelect } from './EmployeeSelect';
 import { DateRangePicker } from './DateRangePicker';
 import type { Employee, ApiFetchParams, EmployeeType } from '../../types';
 import { api } from '../../services/api';
-import './ApiFetchCard.css';
 
 interface ApiFetchCardProps {
   onDataFetched: (params: ApiFetchParams) => void;
@@ -62,6 +61,18 @@ export const ApiFetchCard: React.FC<ApiFetchCardProps> = ({
     setSelectedEmployeeName(employeeName);
   };
 
+  const handleStartDateChange = (newStartDate: string) => {
+    setStartDate(newStartDate);
+
+    // Auto-adjust end date: maintain 2-week window (13 days from start)
+    const start = new Date(newStartDate);
+    if (!isNaN(start.getTime())) {
+      const newEnd = new Date(start);
+      newEnd.setDate(start.getDate() + 13);
+      setEndDate(newEnd.toISOString().split('T')[0]);
+    }
+  };
+
   const handleFetchData = () => {
     if (!selectedEmployeeId || !startDate || !endDate) {
       return;
@@ -87,8 +98,8 @@ export const ApiFetchCard: React.FC<ApiFetchCardProps> = ({
     <Card>
       <CardTitle icon="🔍">Hent fra API</CardTitle>
       
-      <div className="api-fetch-content">
-        <p className="api-fetch-description">
+      <div className="flex flex-col gap-4">
+        <p className="text-slate-400 text-[0.9rem] m-0 leading-relaxed">
           Vælg en medarbejder og datointerval for at hente tidsregistreringer direkte fra API.
         </p>
 
@@ -103,13 +114,13 @@ export const ApiFetchCard: React.FC<ApiFetchCardProps> = ({
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
-          onStartDateChange={setStartDate}
+          onStartDateChange={handleStartDateChange}
           onEndDateChange={setEndDate}
           disabled={isLoading}
         />
 
         {error && (
-          <div className="api-fetch-error">
+          <div className="py-3 px-3 bg-red-500/10 border border-red-500/30 rounded text-red-600 text-[0.9rem]">
             {error}
           </div>
         )}

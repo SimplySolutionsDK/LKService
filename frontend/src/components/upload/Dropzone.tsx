@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import './Dropzone.css';
+import clsx from 'clsx';
 
 interface DropzoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -41,22 +41,27 @@ export const Dropzone: React.FC<DropzoneProps> = ({ onFilesSelected }) => {
   return (
     <>
       <div
-        className={`dropzone ${isDragOver ? 'dragover' : ''}`}
+        className={clsx(
+          'border-2 border-dashed rounded-xl py-8 px-6 text-center cursor-pointer transition-all max-md:py-6 max-md:px-4',
+          isDragOver
+            ? 'border-accent bg-blue-500/[0.08]'
+            : 'border-border bg-blue-500/[0.02] hover:border-accent hover:bg-blue-500/[0.08]'
+        )}
         onClick={handleClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div className="dropzone-icon">📄</div>
-        <p className="dropzone-text">
-          <strong>Klik for at vælge filer</strong><br />
+        <div className="text-[2.5rem] mb-3 opacity-70 max-md:text-[2rem]">📄</div>
+        <p className="text-slate-400 text-[0.9rem] max-md:text-[0.85rem]">
+          <strong className="text-accent-light">Klik for at vælge filer</strong><br />
           eller træk og slip CSV-filer her
         </p>
       </div>
       <input
         ref={fileInputRef}
         type="file"
-        className="file-input"
+        className="hidden"
         multiple
         accept=".csv"
         onChange={handleFileChange}

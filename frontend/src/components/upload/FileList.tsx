@@ -1,5 +1,4 @@
 import React from 'react';
-import './FileList.css';
 
 interface FileListProps {
   files: File[];
@@ -16,19 +15,19 @@ export const FileList: React.FC<FileListProps> = ({ files, onRemove }) => {
   if (files.length === 0) return null;
 
   return (
-    <div className="file-list">
+    <div className="mt-4">
       {files.map((file, index) => (
-        <div key={index} className="file-item">
-          <div className="file-item-info">
-            <span className="file-icon">📄</span>
+        <div key={index} className="flex items-center justify-between py-2.5 px-3 bg-bg-secondary rounded-lg mb-1.5 animate-slide-in">
+          <div className="flex items-center gap-2.5">
+            <span className="text-accent-light">📄</span>
             <div>
-              <div className="file-name">{file.name}</div>
-              <div className="file-size">{formatFileSize(file.size)}</div>
+              <div className="text-[0.85rem] font-medium">{file.name}</div>
+              <div className="text-xs text-slate-500">{formatFileSize(file.size)}</div>
             </div>
           </div>
           <button
             type="button"
-            className="remove-file"
+            className="bg-transparent border-none text-slate-500 cursor-pointer p-1 transition-colors hover:text-red-500"
             onClick={() => onRemove(index)}
             aria-label="Remove file"
           >
