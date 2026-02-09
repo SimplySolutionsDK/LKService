@@ -216,6 +216,7 @@ async def fetch_from_external_api(
         # We'll need to import this or use a shared cache
         from app.routers.upload import preview_cache
         preview_cache[session_id] = {
+            "records": all_records,  # Store original DailyRecords for re-processing
             "outputs": outputs,
             "summaries": summaries,
             "call_out_eligible_days": call_out_eligible_days,

@@ -10,10 +10,37 @@ from app.services.call_out_detector import detect_call_out_eligibility
 WEEKLY_NORM_HOURS = 37.0
 
 # Standard daily hours (used for crediting vacation/sick/holiday)
-STANDARD_DAILY_HOURS = WEEKLY_NORM_HOURS / 5.0  # 7.4 hours
+# Per Danish collective agreement:
+# - Monday-Thursday: 7.5 hours each
+# - Friday: 7.0 hours
+# Total: (4 * 7.5) + 7.0 = 37.0 hours
+STANDARD_DAILY_HOURS = WEEKLY_NORM_HOURS / 5.0  # 7.4 hours (legacy fallback)
 
 # Overtime thresholds
 OVERTIME_1_THRESHOLD = 3.0  # First 3 hours of overtime (legacy)
+
+
+def get_credited_hours_for_day(weekday: int) -> float:
+    """
+    Get credited hours for a day based on the weekday.
+    
+    Per Danish collective agreement:
+    - Monday-Thursday (0-3): 7.5 hours
+    - Friday (4): 7.0 hours
+    - Weekend (5-6): 0.0 hours (weekends are not normally credited)
+    
+    Args:
+        weekday: Day of week (0=Monday, 6=Sunday)
+        
+    Returns:
+        Credited hours for the day
+    """
+    if 0 <= weekday <= 3:  # Monday-Thursday
+        return 7.5
+    elif weekday == 4:  # Friday
+        return 7.0
+    else:  # Weekend
+        return 0.0
 
 # DBR 2026 Overtime Rates (Dansk Bilbrancheråd Collective Agreement)
 # Rates effective May 1, 2025 - February 28, 2026
@@ -73,7 +100,7 @@ def apply_credited_hours(records: list[DailyRecord]) -> list[DailyRecord]:
     Apply credited hours for vacation, sick days, and public holidays.
     
     Days with absent_type set to VACATION, SICK, or PUBLIC_HOLIDAY will be
-    credited with the standard daily hours (7.4) toward the weekly norm.
+    credited with day-specific hours (7.5h Mon-Thu, 7.0h Fri) toward the weekly norm.
     
     Args:
         records: List of DailyRecord objects
@@ -83,8 +110,9 @@ def apply_credited_hours(records: list[DailyRecord]) -> list[DailyRecord]:
     """
     for record in records:
         if record.absent_type in [AbsentType.VACATION, AbsentType.SICK, AbsentType.PUBLIC_HOLIDAY]:
-            # Credit standard daily hours for absence
-            record.credited_hours = STANDARD_DAILY_HOURS
+            # Credit day-specific hours based on weekday
+            weekday = record.date.weekday()
+            record.credited_hours = get_credited_hours_for_day(weekday)
             record.is_day_off = True  # Mark as day off for rate purposes if they work
     
     return records
@@ -402,7 +430,8 @@ def calculate_weekly_overtime(
     daily_outputs: list[DailyOutput] = []
     
     for record in records:
-        day_total = record.total_hours
+        # Include both actual work hours and credited hours (vacation/sick/holiday)
+        day_total = record.total_hours + record.credited_hours
         
         # Categorize this day's overtime
         day_breakdown, day_norm, day_ot = categorize_day_overtime(

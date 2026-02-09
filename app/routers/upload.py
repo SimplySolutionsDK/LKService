@@ -5,7 +5,7 @@ import uuid
 import json
 from datetime import datetime
 
-from app.models.schemas import EmployeeType, ProcessingResult, DailyOutput, WeeklySummary
+from app.models.schemas import EmployeeType, ProcessingResult, DailyOutput, WeeklySummary, DayType, DailyRecord
 from app.services.csv_parser import parse_csv_file
 from app.services.time_calculator import process_records_with_segments
 from app.services.overtime_calculator import process_all_records, apply_credited_hours
@@ -182,6 +182,7 @@ async def preview_data(
         
         # Cache the processed data for later export
         preview_cache[session_id] = {
+            "records": all_records,  # Store original DailyRecords for re-processing
             "outputs": outputs,
             "summaries": summaries,
             "call_out_eligible_days": call_out_eligible_days,
@@ -281,19 +282,22 @@ async def mark_absence(
     """
     Apply absence types to empty days and recalculate hours.
     
+    This endpoint re-runs the full overtime calculation pipeline with absence types applied,
+    ensuring that weekly overtime is correctly distributed across working days.
+    
     Args:
         session_id: Session ID from preview
-        absence_selections: JSON string mapping dates to absence types
-            Example: {"2026-01-15": "Vacation", "2026-01-16": "Sick"}
+        absence_selections: JSON string mapping dates (DD-MM-YYYY) to absence types
+            Example: {"26-01-2026": "Vacation", "27-01-2026": "Sick"}
     
     Returns:
-        Updated preview data with credited hours applied
+        Updated preview data with credited hours applied and overtime recalculated
     """
     if session_id not in preview_cache:
         raise HTTPException(status_code=404, detail="Preview session not found. Please upload files again.")
     
     cached = preview_cache[session_id]
-    outputs = cached["outputs"]
+    all_records = cached["records"]  # Get original DailyRecords
     
     # Parse absence selections
     try:
@@ -301,40 +305,97 @@ async def mark_absence(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid absence selections format")
     
-    # Update outputs with absence types and credited hours
-    for output in outputs:
-        if output.date in absence_dict:
-            absence_type = absence_dict[output.date]
-            
-            # Map string to AbsentType enum
-            absent_type_map = {
-                "Vacation": "Vacation",
-                "Sick": "Sick",
-                "Kursus": "Kursus",
-                "None": "None"
-            }
-            
-            if absence_type in absent_type_map:
-                # This is a DailyOutput object, not DailyRecord
-                # We need to track absence for recalculation but DailyOutput doesn't have absent_type
-                # We'll need to add credited hours directly
-                if absence_type != "None":
-                    # Standard daily credit: 7.4 hours
-                    output.total_hours = 7.4
-                    output.normal_hours = 7.4
-                else:
-                    # Reset to empty if None selected
-                    if len(output.entries) == 0:
-                        output.total_hours = 0.0
-                        output.normal_hours = 0.0
+    # Map string to AbsentType enum
+    from app.models.schemas import AbsentType
+    absent_type_map = {
+        "Vacation": AbsentType.VACATION,
+        "Sick": AbsentType.SICK,
+        "Kursus": AbsentType.KURSUS,
+        "None": AbsentType.NONE
+    }
     
-    # Recalculate weekly summaries with updated hours
-    from app.services.overtime_calculator import recalculate_weekly_summaries
-    summaries = recalculate_weekly_summaries(outputs)
+    # Create a dict of existing records by date for quick lookup
+    # Date format in absence_dict is DD-MM-YYYY
+    records_by_date = {}
+    for record in all_records:
+        date_key = record.date.strftime("%d-%m-%Y")
+        records_by_date[date_key] = record
     
-    # Update cache
+    # Apply absence types to records
+    for date_str, absence_type_str in absence_dict.items():
+        if absence_type_str in absent_type_map:
+            absence_type = absent_type_map[absence_type_str]
+            
+            if date_str in records_by_date:
+                # Update existing record
+                record = records_by_date[date_str]
+                # Only update if the record has no actual time entries
+                if len(record.entries) == 0:
+                    record.absent_type = absence_type
+            else:
+                # Create a new record for this date if it doesn't exist
+                # Parse the date string (DD-MM-YYYY)
+                from datetime import date as date_type
+                date_parts = date_str.split('-')
+                if len(date_parts) == 3:
+                    day = int(date_parts[0])
+                    month = int(date_parts[1])
+                    year = int(date_parts[2])
+                    record_date = date_type(year, month, day)
+                    
+                    # Determine day type
+                    weekday = record_date.weekday()
+                    if weekday == 5:
+                        day_type = DayType.SATURDAY
+                    elif weekday == 6:
+                        day_type = DayType.SUNDAY
+                    else:
+                        day_type = DayType.WEEKDAY
+                    
+                    # Get worker name from first existing record
+                    worker_name = all_records[0].worker_name if all_records else "Unknown"
+                    
+                    # Create new DailyRecord with absence type
+                    new_record = DailyRecord(
+                        worker_name=worker_name,
+                        date=record_date,
+                        day_name=record_date.strftime('%A'),
+                        day_type=day_type,
+                        week_number=record_date.isocalendar()[1],
+                        entries=[],
+                        total_hours=0.0,
+                        absent_type=absence_type
+                    )
+                    all_records.append(new_record)
+                    records_by_date[date_str] = new_record
+    
+    # Re-run the full processing pipeline
+    from app.services.time_calculator import process_records_with_segments
+    from app.services.overtime_calculator import apply_credited_hours, process_all_records
+    from app.services.call_out_detector import mark_call_out_eligibility, get_call_out_eligible_days
+    from app.services.absence_detector import mark_absence_types
+    from app.services.date_filler import fill_missing_dates
+    
+    # Process with the updated absence types
+    all_records = process_records_with_segments(all_records)
+    all_records = mark_call_out_eligibility(all_records)
+    all_records = mark_absence_types(all_records)
+    all_records = apply_credited_hours(all_records)  # This now uses day-specific hours
+    
+    # Recalculate overtime with the credited hours
+    summaries, outputs = process_all_records(all_records)
+    
+    # Fill in missing dates
+    outputs = fill_missing_dates(outputs)
+    
+    # Get call out eligible days
+    call_out_eligible_days = get_call_out_eligible_days(all_records)
+    
+    # Update cache with new results
+    preview_cache[session_id]["records"] = all_records
     preview_cache[session_id]["outputs"] = outputs
     preview_cache[session_id]["summaries"] = summaries
+    preview_cache[session_id]["call_out_eligible_days"] = call_out_eligible_days
     
     # Convert to dictionaries for JSON response
     daily_data = []
@@ -355,6 +416,7 @@ async def mark_absence(
         "session_id": session_id,
         "daily": daily_data,
         "weekly": weekly_data,
+        "call_out_eligible_days": call_out_eligible_days,
         "total_records": len(outputs),
         "total_weeks": len(summaries)
     })

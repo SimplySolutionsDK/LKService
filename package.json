@@ -6,8 +6,11 @@
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
     "frontend:preview": "cd frontend && npm run preview",
-    "backend:dev": "cd app && uvicorn main:app --reload",
-    "dev": "echo Run 'npm run frontend:dev' and 'npm run backend:dev' in separate terminals"
+    "backend:dev": ".\\venv\\Scripts\\python.exe -m uvicorn app.main:app --reload",
+    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"blue,green\" \"npm run backend:dev\" \"npm run frontend:dev\""
   },
-  "description": "Time Registration CSV Parser with React frontend and FastAPI backend"
+  "description": "Time Registration CSV Parser with React frontend and FastAPI backend",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }

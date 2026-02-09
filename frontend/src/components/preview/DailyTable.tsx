@@ -99,21 +99,21 @@ export const DailyTable: React.FC<DailyTableProps> = ({
                       <button
                         className={`absence-btn ${currentAbsence === 'Vacation' ? 'active' : ''}`}
                         onClick={() => onAbsenceChange(row.date, 'Vacation')}
-                        title="Ferie (7.4 timer)"
+                        title={`Ferie (${row.day === 'Friday' ? '7.0' : '7.5'} timer)`}
                       >
                         Ferie
                       </button>
                       <button
                         className={`absence-btn ${currentAbsence === 'Sick' ? 'active' : ''}`}
                         onClick={() => onAbsenceChange(row.date, 'Sick')}
-                        title="Syg (7.4 timer)"
+                        title={`Syg (${row.day === 'Friday' ? '7.0' : '7.5'} timer)`}
                       >
                         Syg
                       </button>
                       <button
                         className={`absence-btn ${currentAbsence === 'Kursus' ? 'active' : ''}`}
                         onClick={() => onAbsenceChange(row.date, 'Kursus')}
-                        title="Kursus (7.4 timer)"
+                        title={`Kursus (${row.day === 'Friday' ? '7.0' : '7.5'} timer)`}
                       >
                         Kursus
                       </button>
