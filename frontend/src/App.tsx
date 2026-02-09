@@ -2,20 +2,24 @@ import { useState } from 'react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { UploadCard } from './components/upload/UploadCard';
-import { SettingsCard } from './components/upload/SettingsCard';
 import { ApiFetchCard } from './components/api-fetch/ApiFetchCard';
 import { PreviewSection } from './components/preview/PreviewSection';
 import { EntriesModal } from './components/modals/EntriesModal';
+import { Button } from './components/ui/Button';
+import { Status } from './components/ui/Status';
 import { useFileUpload } from './hooks/useFileUpload';
 import { usePreview } from './hooks/usePreview';
 import type { EmployeeType, DailyRecord, ApiFetchParams } from './types';
 import './App.css';
+
+type DataSource = 'api' | 'csv';
 
 function App() {
   const { files, addFiles, removeFile } = useFileUpload();
   const [employeeType, setEmployeeType] = useState<EmployeeType>('Svend');
   const [selectedRecord, setSelectedRecord] = useState<DailyRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [dataSource, setDataSource] = useState<DataSource>('api');
 
   const {
     previewData,
@@ -72,32 +76,58 @@ function App() {
 
   return (
     <div className="container">
-      <Header />
+      <Header 
+        employeeType={employeeType}
+        onEmployeeTypeChange={setEmployeeType}
+      />
 
       <div className="upload-section">
+        <div className="tab-switcher">
+          <button
+            type="button"
+            className={`tab-button ${dataSource === 'api' ? 'active' : ''}`}
+            onClick={() => setDataSource('api')}
+          >
+            🔍 Hent fra API
+          </button>
+          <button
+            type="button"
+            className={`tab-button ${dataSource === 'csv' ? 'active' : ''}`}
+            onClick={() => setDataSource('csv')}
+          >
+            📁 Upload CSV
+          </button>
+        </div>
+
         <form onSubmit={(e) => { e.preventDefault(); handlePreview(); }}>
-          <div className="upload-controls">
-            <UploadCard
-              files={files}
-              onFilesSelected={handleFilesSelected}
-              onFileRemove={handleFileRemove}
-            />
-
-            <SettingsCard
-              employeeType={employeeType}
-              onEmployeeTypeChange={setEmployeeType}
-              onPreview={handlePreview}
-              previewDisabled={files.length === 0 || isLoading}
-              status={status}
-            />
-          </div>
-
-          <div className="api-fetch-section">
-            <ApiFetchCard
-              onDataFetched={handleApiFetchedData}
-              employeeType={employeeType}
-              isLoading={isLoading}
-            />
+          <div className="content-area">
+            {dataSource === 'api' ? (
+              <ApiFetchCard
+                onDataFetched={handleApiFetchedData}
+                employeeType={employeeType}
+                isLoading={isLoading}
+              />
+            ) : (
+              <div className="csv-upload-section">
+                <UploadCard
+                  files={files}
+                  onFilesSelected={handleFilesSelected}
+                  onFileRemove={handleFileRemove}
+                />
+                
+                <div className="csv-preview-controls">
+                  <Button
+                    variant="primary"
+                    onClick={handlePreview}
+                    disabled={files.length === 0 || isLoading}
+                  >
+                    <span>👁</span>
+                    Vis Preview
+                  </Button>
+                  {status && <Status type={status.type} message={status.message} />}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="info-box">

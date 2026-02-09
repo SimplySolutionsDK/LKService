@@ -4,22 +4,62 @@
     gap: 1.5rem;
 }
 
-.upload-controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+.tab-switcher {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    background: var(--bg-secondary);
+    padding: 0.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.tab-button:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.tab-button.active {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.content-area {
+    margin-bottom: 1.5rem;
+}
+
+.csv-upload-section {
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
 }
 
-@media (max-width: 768px) {
-    .upload-controls {
-        grid-template-columns: 1fr;
-    }
+.csv-preview-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.api-fetch-section {
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 2px solid var(--border-color);
+.csv-preview-controls button {
+    width: 100%;
 }
 
 .info-box {
@@ -35,4 +75,15 @@
 
 .info-box strong {
     color: var(--accent-secondary);
+}
+
+@media (max-width: 768px) {
+    .tab-switcher {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .tab-button {
+        width: 100%;
+    }
 }

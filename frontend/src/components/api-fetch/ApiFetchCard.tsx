@@ -44,14 +44,14 @@ export const ApiFetchCard: React.FC<ApiFetchCardProps> = ({
     loadEmployees();
   }, []);
 
-  // Set default date range (current week)
+  // Set default date range (2 work weeks: Monday to Sunday of the following week)
   useEffect(() => {
     const today = new Date();
     const monday = new Date(today);
     monday.setDate(today.getDate() - today.getDay() + 1);
     
     const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    sunday.setDate(monday.getDate() + 13);
 
     setStartDate(monday.toISOString().split('T')[0]);
     setEndDate(sunday.toISOString().split('T')[0]);
