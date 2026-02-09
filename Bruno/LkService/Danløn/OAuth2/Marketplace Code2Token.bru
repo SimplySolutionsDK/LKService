@@ -1,0 +1,34 @@
+meta {
+  name: Marketplace Code2Token
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{DanlonMarketplaceEndpoint}}/code2token/{{DanlonMarketplaceCode}}
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response?.access_token) {
+    bru.setEnvVar("DanlonAccessToken", response.access_token);
+    console.log("Final Danlon access token stored");
+  }
+  
+  if (response?.refresh_token) {
+    bru.setEnvVar("DanlonRefreshToken", response.refresh_token);
+    console.log("Final Danlon refresh token stored");
+  }
+  
+  if (response?.expires_in) {
+    console.log("Token expires in:", response.expires_in, "seconds");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

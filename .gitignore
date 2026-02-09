@@ -215,3 +215,6 @@ Data/TimeRegViewRep.csv
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# Danlon OAuth2 token storage
+danlon_tokens.json

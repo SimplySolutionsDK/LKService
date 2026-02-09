@@ -1,0 +1,33 @@
+meta {
+  name: List Pay Parts
+  type: graphql
+  seq: 4
+}
+
+post {
+  url: {{DanlonGraphQLEndpoint}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query($company_id: ID!) {
+    pay_parts(company_id: $company_id) {
+      code
+      company {
+        id
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "company_id": "{{DanlonCompanyId}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

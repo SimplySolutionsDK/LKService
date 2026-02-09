@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { UploadCard } from './components/upload/UploadCard';
 import { SettingsCard } from './components/upload/SettingsCard';
 import { ApiFetchCard } from './components/api-fetch/ApiFetchCard';
+import { DanlonConnect } from './components/danlon/DanlonConnect';
 import { PreviewSection } from './components/preview/PreviewSection';
 import { EntriesModal } from './components/modals/EntriesModal';
 import { useFileUpload } from './hooks/useFileUpload';
 import { usePreview } from './hooks/usePreview';
-import type { EmployeeType, DailyRecord, ApiFetchParams } from './types';
+import { api } from './services/api';
+import type { EmployeeType, DailyRecord, ApiFetchParams, DanlonConnectionStatus } from './types';
 import './App.css';
 
 function App() {
@@ -16,6 +18,8 @@ function App() {
   const [employeeType, setEmployeeType] = useState<EmployeeType>('Svend');
   const [selectedRecord, setSelectedRecord] = useState<DailyRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [danlonStatus, setDanlonStatus] = useState<DanlonConnectionStatus | null>(null);
+  const [isSubmittingToDanlon, setIsSubmittingToDanlon] = useState(false);
 
   const {
     previewData,
@@ -34,6 +38,42 @@ function App() {
     updateAbsenceSelection,
     clearPreview,
   } = usePreview();
+
+  // Load Danlon status on mount
+  useEffect(() => {
+    loadDanlonStatus();
+  }, []);
+
+  const loadDanlonStatus = async () => {
+    try {
+      const status = await api.getDanlonStatus();
+      setDanlonStatus(status);
+    } catch (error) {
+      console.error('Failed to load Danlon status:', error);
+    }
+  };
+
+  const handleSubmitToDanlon = async () => {
+    if (!previewData?.session_id) {
+      alert('Ingen data at sende. Upload filer først.');
+      return;
+    }
+
+    if (!confirm('Er du sikker på at du vil sende timeregistreringerne til Danløn?')) {
+      return;
+    }
+
+    setIsSubmittingToDanlon(true);
+
+    try {
+      const result = await api.submitToDanlon(previewData.session_id);
+      alert(`✓ ${result.message}\n\nAntal linjer: ${result.submitted_count}\nAntal medarbejdere: ${result.workers_count}`);
+    } catch (error) {
+      alert(`✕ Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`);
+    } finally {
+      setIsSubmittingToDanlon(false);
+    }
+  };
 
   const handleFilesSelected = (newFiles: File[]) => {
     addFiles(newFiles);
@@ -75,6 +115,8 @@ function App() {
       <Header />
 
       <div className="upload-section">
+        <DanlonConnect />
+
         <form onSubmit={(e) => { e.preventDefault(); handlePreview(); }}>
           <div className="upload-controls">
             <UploadCard
@@ -124,6 +166,9 @@ function App() {
             onAbsenceChange={updateAbsenceSelection}
             onShowDetails={handleShowDetails}
             onExport={exportData}
+            onSubmitToDanlon={handleSubmitToDanlon}
+            danlonConnected={danlonStatus?.connected || false}
+            isSubmittingToDanlon={isSubmittingToDanlon}
           />
         )}
       </div>

@@ -130,3 +130,18 @@ export interface ApiFetchParams {
   startDate: string;
   endDate: string;
 }
+
+// Danlon integration types
+export interface DanlonConnectionStatus {
+  connected: boolean;
+  company_id: string | null;
+  connected_at: string | null;
+}
+
+export interface DanlonSubmitResult {
+  success: boolean;
+  message: string;
+  submitted_count?: number;
+  workers_count?: number;
+  danlon_result?: any;
+}

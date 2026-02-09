@@ -19,6 +19,9 @@ interface PreviewSectionProps {
   onAbsenceChange: (date: string, absenceType: AbsenceType) => void;
   onShowDetails: (index: number) => void;
   onExport: () => void;
+  onSubmitToDanlon?: () => void;
+  danlonConnected?: boolean;
+  isSubmittingToDanlon?: boolean;
 }
 
 export const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -33,6 +36,9 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
   onAbsenceChange,
   onShowDetails,
   onExport,
+  onSubmitToDanlon,
+  danlonConnected = false,
+  isSubmittingToDanlon = false,
 }) => {
   return (
     <div className="preview-section active">
@@ -65,6 +71,33 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
           onFormatChange={onFormatChange}
           onExport={onExport}
         />
+
+        {onSubmitToDanlon && (
+          <div className="danlon-submit-section">
+            <button
+              className="danlon-submit-button"
+              onClick={onSubmitToDanlon}
+              disabled={!danlonConnected || isSubmittingToDanlon}
+              title={!danlonConnected ? 'Tilslut til Danløn først' : 'Send til Danløn'}
+            >
+              {isSubmittingToDanlon ? (
+                <>
+                  <span className="spinner"></span>
+                  Sender til Danløn...
+                </>
+              ) : (
+                <>
+                  📤 Send til Danløn
+                </>
+              )}
+            </button>
+            {!danlonConnected && (
+              <p className="danlon-info-text">
+                Du skal først tilslutte til Danløn for at kunne sende timeregistreringer.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

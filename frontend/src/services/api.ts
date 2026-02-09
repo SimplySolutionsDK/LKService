@@ -5,7 +5,9 @@ import type {
   CallOutSelections, 
   AbsenceSelections,
   EmployeeSearchResponse,
-  ApiFetchParams
+  ApiFetchParams,
+  DanlonConnectionStatus,
+  DanlonSubmitResult
 } from '../types';
 
 export const api = {
@@ -107,6 +109,45 @@ export const api = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to fetch time registrations');
+    }
+
+    return response.json();
+  },
+
+  async getDanlonStatus(): Promise<DanlonConnectionStatus> {
+    const response = await fetch('/danlon/status', {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to get Danlon status');
+    }
+
+    return response.json();
+  },
+
+  async disconnectDanlon(): Promise<{ success: boolean; message: string }> {
+    const response = await fetch('/danlon/revoke', {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to disconnect from Danlon');
+    }
+
+    return response.json();
+  },
+
+  async submitToDanlon(sessionId: string): Promise<DanlonSubmitResult> {
+    const response = await fetch(`/danlon/submit-hours/${sessionId}`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to submit hours to Danlon');
     }
 
     return response.json();

@@ -1,0 +1,46 @@
+meta {
+  name: Exchange Code for Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{DanlonOAuthServerRoot}}/auth/realms/{{DanlonRealm}}/protocol/openid-connect/token
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  grant_type: authorization_code
+  client_id: {{DanlonClientId}}
+  client_secret: {{DanlonClientSecret}}
+  code: {{DanlonTempCode}}
+  redirect_uri: http://localhost:8000/danlon/callback
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response?.access_token) {
+    bru.setEnvVar("DanlonAccessToken", response.access_token);
+    console.log("Danlon access token stored");
+  }
+  
+  if (response?.refresh_token) {
+    bru.setEnvVar("DanlonRefreshToken", response.refresh_token);
+    console.log("Danlon refresh token stored");
+  }
+  
+  if (response?.expires_in) {
+    console.log("Token expires in:", response.expires_in, "seconds");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

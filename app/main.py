@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 
-from app.routers import upload, api_fetch
+from app.routers import upload, api_fetch, danlon
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,6 +29,7 @@ app = FastAPI(
 # Include routers
 app.include_router(upload.router)
 app.include_router(api_fetch.router)
+app.include_router(danlon.router)
 
 # Mount static files from the built frontend (only if dist exists)
 if FRONTEND_DIST.exists():

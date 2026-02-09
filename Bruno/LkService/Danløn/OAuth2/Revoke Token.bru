@@ -1,0 +1,31 @@
+meta {
+  name: Revoke Token
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{DanlonOAuthServerRoot}}/auth/realms/{{DanlonRealm}}/protocol/openid-connect/revoke
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  client_id: {{DanlonClientId}}
+  client_secret: {{DanlonClientSecret}}
+  token: {{DanlonRefreshToken}}
+}
+
+script:post-response {
+  console.log("Danlon token revoked");
+  console.log("You may want to clear DanlonAccessToken and DanlonRefreshToken from environment variables");
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

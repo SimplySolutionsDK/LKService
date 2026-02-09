@@ -1,0 +1,25 @@
+meta {
+  name: List Companies
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{DanlonGraphQLEndpoint}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  {
+    companies {
+      id
+      name
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,45 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{DanlonOAuthServerRoot}}/auth/realms/{{DanlonRealm}}/protocol/openid-connect/token
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  grant_type: refresh_token
+  client_id: {{DanlonClientId}}
+  client_secret: {{DanlonClientSecret}}
+  refresh_token: {{DanlonRefreshToken}}
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response?.access_token) {
+    bru.setEnvVar("DanlonAccessToken", response.access_token);
+    console.log("Danlon access token refreshed and stored");
+  }
+  
+  if (response?.refresh_token) {
+    bru.setEnvVar("DanlonRefreshToken", response.refresh_token);
+    console.log("Danlon refresh token updated");
+  }
+  
+  if (response?.expires_in) {
+    console.log("Token expires in:", response.expires_in, "seconds");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
