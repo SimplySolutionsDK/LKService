@@ -237,6 +237,7 @@ async def export_from_preview(
     cached = preview_cache[session_id]
     outputs = cached["outputs"]
     summaries = cached["summaries"]
+    records = cached.get("records", None)  # Get original DailyRecords
     
     # Parse call out selections
     try:
@@ -244,8 +245,8 @@ async def export_from_preview(
     except json.JSONDecodeError:
         call_out_dict = {}
     
-    # Apply call out payment to selected days
-    outputs = apply_call_out_payment(outputs, call_out_dict)
+    # Apply call out payment to selected days with overtime recalculation
+    outputs = apply_call_out_payment(outputs, call_out_dict, records)
     
     # Generate CSV based on format
     if output_format == "weekly":

@@ -28,9 +28,12 @@ async def fetch_employees():
     Fetch list of employees from the external Core API.
     
     Returns:
-        JSON with employee list
+        JSON with employee list (filtered to exclude specific employees)
     """
     auth_service = get_auth_service()
+    
+    # List of employees to hide
+    HIDDEN_EMPLOYEES = ["Kundebil", "Helle", "Lars", "Thomas Knudsen"]
     
     try:
         # Get authentication token
@@ -43,6 +46,47 @@ async def fetch_employees():
             response.raise_for_status()
             
             data = response.json()
+            
+            # Debug: Log first employee to see structure
+            if isinstance(data, dict) and 'results' in data and len(data.get('results', [])) > 0:
+                logger.info(f"🔍 Sample employee data: {data['results'][0]}")
+            elif isinstance(data, list) and len(data) > 0:
+                logger.info(f"🔍 Sample employee data: {data[0]}")
+            
+            # Filter out hidden employees
+            if isinstance(data, dict) and 'results' in data:
+                # If response has a 'results' array
+                original_count = len(data.get('results', []))
+                data['results'] = [
+                    emp for emp in data.get('results', [])
+                    if not any(
+                        hidden_name.lower() == str(emp.get('firstname', '')).lower() or
+                        hidden_name.lower() == str(emp.get('lastname', '')).lower() or
+                        hidden_name.lower() == f"{emp.get('firstname', '')} {emp.get('lastname', '')}".strip().lower()
+                        for hidden_name in HIDDEN_EMPLOYEES
+                    )
+                ]
+                filtered_count = len(data['results'])
+                logger.info(f"🔒 Filtered employees: {original_count} -> {filtered_count} (hidden {original_count - filtered_count})")
+                
+                # Update totalCount if present
+                if 'totalCount' in data:
+                    data['totalCount'] = filtered_count
+            elif isinstance(data, list):
+                # If response is a direct array
+                original_count = len(data)
+                data = [
+                    emp for emp in data
+                    if not any(
+                        hidden_name.lower() == str(emp.get('firstname', '')).lower() or
+                        hidden_name.lower() == str(emp.get('lastname', '')).lower() or
+                        hidden_name.lower() == f"{emp.get('firstname', '')} {emp.get('lastname', '')}".strip().lower()
+                        for hidden_name in HIDDEN_EMPLOYEES
+                    )
+                ]
+                filtered_count = len(data)
+                logger.info(f"🔒 Filtered employees: {original_count} -> {filtered_count} (hidden {original_count - filtered_count})")
+            
             return JSONResponse(content=data)
             
     except httpx.HTTPError as e:
