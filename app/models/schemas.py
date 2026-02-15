@@ -35,6 +35,7 @@ class TimeEntry(BaseModel):
     total_hours: float
     hours_in_norm: float = 0.0
     hours_outside_norm: float = 0.0
+    duration_display: Optional[str] = None  # Format "H:MM" for display (e.g., "2:26")
 
 
 class DailyRecord(BaseModel):

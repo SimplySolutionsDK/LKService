@@ -66,6 +66,7 @@ export const EntriesModal: React.FC<EntriesModalProps> = ({ isOpen, record, onCl
                 <th className={MTH}>Sag Nr</th>
                 <th className={MTH}>Start</th>
                 <th className={MTH}>Slut</th>
+                <th className={MTH}>Timer (HH:MM)</th>
                 <th className={MTH}>Timer</th>
               </tr>
             </thead>
@@ -77,6 +78,9 @@ export const EntriesModal: React.FC<EntriesModalProps> = ({ isOpen, record, onCl
                     <td className={MTD}>{displayText}</td>
                     <td className={MTD}>{entry.start_time}</td>
                     <td className={MTD}>{entry.end_time}</td>
+                    <td className={`${MTD} text-right [font-variant-numeric:tabular-nums]`}>
+                      {entry.duration_display || '—'}
+                    </td>
                     <td className={`${MTD} text-right [font-variant-numeric:tabular-nums]`}>
                       {entry.total_hours.toFixed(2)}
                     </td>

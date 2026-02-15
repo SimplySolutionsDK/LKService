@@ -10,6 +10,39 @@ from app.models.schemas import DailyRecord, TimeEntry, DayType
 logger = logging.getLogger(__name__)
 
 
+def calculate_hours_from_timestamps(start_dt: datetime, end_dt: datetime) -> float:
+    """
+    Calculate duration in decimal hours from timestamps including seconds.
+    This ensures precision matching FTZ calculations.
+    
+    Args:
+        start_dt: Start datetime
+        end_dt: End datetime
+        
+    Returns:
+        Duration in decimal hours, rounded to 2 decimal places
+    """
+    duration = end_dt - start_dt
+    total_seconds = duration.total_seconds()
+    return round(total_seconds / 3600.0, 2)
+
+
+def format_duration_as_hhmm(hours: float) -> str:
+    """
+    Convert decimal hours to H:MM format for display.
+    
+    Args:
+        hours: Duration in decimal hours
+        
+    Returns:
+        Duration formatted as "H:MM" (e.g., "2:26" for 2.43 hours)
+    """
+    total_minutes = int(round(hours * 60))
+    h = total_minutes // 60
+    m = total_minutes % 60
+    return f"{h}:{m:02d}"
+
+
 def transform_time_registrations_to_records(
     time_registrations: List[Dict[str, Any]],
     employee_name: str
@@ -84,15 +117,19 @@ def transform_time_registrations_to_records(
             # Type 1 = Work, Type 4 = Other/Non-billable
             activity = f"Sag {reg['case_no']}" if reg['case_no'] > 0 else "Diverse"
             
+            # Calculate hours from timestamps with full seconds precision
+            calculated_hours = calculate_hours_from_timestamps(reg['start_dt'], reg['end_dt'])
+            
             entry = TimeEntry(
                 activity=activity,
                 case_number=str(reg['case_no']) if reg['case_no'] > 0 else None,
                 start_time=time(reg['start_dt'].hour, reg['start_dt'].minute),
                 end_time=time(reg['end_dt'].hour, reg['end_dt'].minute),
-                total_hours=reg['elapsed_hours']
+                total_hours=calculated_hours,
+                duration_display=format_duration_as_hhmm(calculated_hours)
             )
             entries.append(entry)
-            total_hours += reg['elapsed_hours']
+            total_hours += calculated_hours
         
         # Create daily record
         daily_record = DailyRecord(

@@ -4,6 +4,7 @@ export interface TimeEntry {
   start_time: string;
   end_time: string;
   total_hours: number;
+  duration_display?: string;  // Optional HH:MM format (e.g., "2:26")
 }
 
 export interface OvertimeBreakdown {
