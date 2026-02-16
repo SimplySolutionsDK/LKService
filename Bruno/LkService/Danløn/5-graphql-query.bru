@@ -1,7 +1,7 @@
 meta {
-  name: 5. GraphQL Query
+  name: 8. Get Company Details & Employees
   type: graphql
-  seq: 5
+  seq: 8
 }
 
 post {
@@ -10,132 +10,189 @@ post {
   auth: bearer
 }
 
-auth:bearer {
-  token: {{danlon_access_token}}
-}
-
 headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
 body:graphql {
-  query GetEmployees {
-    employees {
-      id
-      firstName
-      lastName
-      email
-      employeeNumber
-      department
-      position
+  query GetCompanyDetailsAndEmployees($companyIds: [String!]!) {
+    companiesExt(input: {companyIds: $companyIds}) {
+      companies {
+        id
+        name
+        vatId
+        address {
+          street
+          street2
+          postalCode
+          city
+          countryCode
+          country
+        }
+        employees {
+          employees {
+            id
+            active
+            domainId
+            name
+            email
+            birthDate
+            address {
+              street
+              street2
+              postalCode
+              city
+              countryCode
+              country
+            }
+            employment {
+              beginDate
+              endDate
+              jobTitle
+              paymentType
+              paymentTime
+              salary
+              hourlyRate
+              hoursPerWeek
+              specialDaysOff
+              pensionCorporate
+              pensionEmployee
+            }
+            payParts {
+              payParts {
+                id
+                code
+                units
+                rate
+                amount
+              }
+            }
+          }
+        }
+        payParts {
+          payParts {
+            id
+            code
+            units
+            rate
+            amount
+            employee {
+              id
+              name
+            }
+            company {
+              id
+              name
+            }
+          }
+        }
+      }
     }
   }
 }
 
 body:graphql:vars {
   {
-    
+    "companyIds": ["{{company_id}}"]
   }
-}
-
-docs {
-  # GraphQL API Query
-  
-  This endpoint provides access to the Danløn GraphQL API for querying data.
-  
-  **Prerequisites:**
-  - Must have completed Steps 1-2 (OAuth2 authentication)
-  - danlon_access_token must be set and valid
-  - Company context should be selected (Step 3) if required by the API
-  
-  **Demo GraphQL URL:**
-  - https://api-demo.danlon.dk/graphql
-  
-  **Production GraphQL URL:**
-  - https://api.danlon.dk/graphql
-  
-  **Example Queries:**
-  
-  1. Get Employees:
-  ```graphql
-  query GetEmployees {
-    employees {
-      id
-      firstName
-      lastName
-      email
-      employeeNumber
-    }
-  }
-  ```
-  
-  2. Get Time Registrations:
-  ```graphql
-  query GetTimeRegistrations($startDate: String!, $endDate: String!) {
-    timeRegistrations(startDate: $startDate, endDate: $endDate) {
-      id
-      employeeId
-      date
-      hours
-      activity
-      description
-    }
-  }
-  ```
-  
-  3. Get Companies:
-  ```graphql
-  query GetCompanies {
-    companies {
-      id
-      name
-      organizationNumber
-    }
-  }
-  ```
-  
-  **Variables:**
-  Variables can be added in the "body:graphql:vars" section.
-  Example:
-  ```json
-  {
-    "startDate": "2026-01-01",
-    "endDate": "2026-01-31"
-  }
-  ```
-  
-  **Note:** The actual GraphQL schema and available queries depend on the Danløn API
-  documentation. Update the query based on the specific data you need to fetch.
 }
 
 script:post-response {
   const response = res.getBody();
   
   if (response && res.status === 200) {
-    if (response.data) {
-      console.log("✓ GraphQL query successful");
-      console.log("Data received:", JSON.stringify(response.data, null, 2));
+    if (response.data && response.data.companiesExt) {
+      const companies = response.data.companiesExt.companies;
       
-      // Store data in environment if needed
-      // Example: if fetching companies list
-      if (response.data.companies && response.data.companies.length > 0) {
-        const firstCompany = response.data.companies[0];
-        bru.setEnvVar("company_id", firstCompany.id);
-        console.log(`✓ First company ID stored: ${firstCompany.id}`);
-      }
-      
-      // Example: if fetching employees
-      if (response.data.employees && response.data.employees.length > 0) {
-        console.log(`✓ Found ${response.data.employees.length} employees`);
+      if (companies && companies.length > 0) {
+        companies.forEach((company) => {
+          console.log(`\n✓ Company: ${company.name}`);
+          console.log(`  ID: ${company.id}`);
+          console.log(`  VAT: ${company.vatId || 'N/A'}`);
+          
+          if (company.employees && company.employees.employees) {
+            const employees = company.employees.employees;
+            console.log(`\n  📋 Employees: ${employees.length}`);
+            
+            employees.forEach((emp, index) => {
+              console.log(`\n  ${index + 1}. ${emp.name}`);
+              console.log(`     ID: ${emp.id}`);
+              console.log(`     Email: ${emp.email || 'N/A'}`);
+              console.log(`     Active: ${emp.active ? 'Yes' : 'No'}`);
+              
+              if (emp.employment) {
+                console.log(`     Job: ${emp.employment.jobTitle || 'N/A'}`);
+                console.log(`     Salary: ${emp.employment.salary || 'N/A'}`);
+                console.log(`     Hours/Week: ${emp.employment.hoursPerWeek || 'N/A'}`);
+              }
+              
+              if (emp.payParts && emp.payParts.payParts) {
+                console.log(`     Pay Parts: ${emp.payParts.payParts.length}`);
+              }
+            });
+            
+            // Store first employee ID for convenience
+            if (employees.length > 0 && employees[0].id) {
+              bru.setEnvVar("employee_id", employees[0].id);
+              console.log(`\n  ✓ First employee ID stored in 'employee_id' variable`);
+            }
+          }
+          
+          if (company.payParts && company.payParts.payParts) {
+            console.log(`\n  💰 Total Pay Parts: ${company.payParts.payParts.length}`);
+          }
+        });
       }
     }
     
     if (response.errors) {
-      console.error("✗ GraphQL errors:", JSON.stringify(response.errors, null, 2));
+      console.error("\n✗ GraphQL errors:");
+      console.error(JSON.stringify(response.errors, null, 2));
     }
   } else {
-    console.error("✗ GraphQL query failed");
+    console.error("✗ Query failed");
     console.error("Status:", res.status);
     console.error("Response:", response);
+    
+    if (res.status === 401) {
+      console.error("\n⚠ Authentication failed - Token may be expired");
+      console.error("→ Run Step 6 to refresh your access token");
+    }
   }
+}
+
+docs {
+  # Get Company Details with All Employees
+  
+  **IMPORTANT: Run Step 6 first to refresh your access token!**
+  
+  This query fetches detailed information for a specific company including:
+  - All employees in the company
+  - Employee employment details (salary, hours, etc.)
+  - All pay parts for the company and employees
+  
+  **Prerequisites:**
+  - Valid refresh_token (from Steps 1-2)
+  - Fresh access_token (run Step 6)
+  - Company ID (run Step 7 first to get available company IDs)
+  
+  **How to use:**
+  1. Run Step 7 to get list of companies
+  2. The first company ID is automatically stored in `company_id` variable
+  3. Run this query to get all employees for that company
+  4. Or manually update the `company_id` variable with a different company ID
+  
+  **Response includes:**
+  - Company information (name, VAT, address)
+  - All employees with full details
+  - Employment information (salary, hours, job title, etc.)
+  - Pay parts for each employee
+  
+  **Note:**
+  This query fetches ALL employees in the company. For specific employees only,
+  you can add an `employeeIds` filter in the employees input.
 }

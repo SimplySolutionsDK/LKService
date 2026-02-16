@@ -1,0 +1,72 @@
+meta {
+  name: 5. Revoke Token (Disconnect)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{danlon_revoke_url}}
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  client_id: {{danlon_client_id}}
+  client_secret: {{danlon_client_secret}}
+  token: {{danlon_refresh_token}}
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 204) {
+    console.log("\n========================================");
+    console.log("✓ TOKEN REVOKED SUCCESSFULLY");
+    console.log("========================================");
+    console.log("The refresh token has been revoked on the OAuth2 server.");
+    console.log("Danløn's integration page will now show the connection as disconnected.");
+    console.log("\nYou should now clean up locally:");
+    console.log("  • Delete stored refresh_token");
+    console.log("  • Disable any scheduled services");
+    console.log("  • Clean up integration data");
+    console.log("========================================\n");
+  } else {
+    console.error("✗ Token revocation failed");
+    console.error("Status:", res.status);
+    console.error("Response:", res.getBody());
+  }
+}
+
+docs {
+  # Revoke Token (Disconnect - Scenario 2)
+  
+  Use this endpoint when a user initiates a disconnect from YOUR integration page.
+  This revokes the refresh token on Danløn's OAuth2 server.
+  
+  **When to use:**
+  - User wants to disconnect from Danløn via your application
+  - You need to clean up an existing connection
+  
+  **Important:**
+  - This is a server-to-server POST call (not a browser redirect)
+  - After revoking, delete your persisted tokens and clean up locally
+  - Danløn's integration page shows connection status based on the OAuth2 server,
+    so if you only delete tokens locally without revoking, Danløn still shows access as granted
+  
+  **Disconnect Scenario 1 (initiated from Danløn):**
+  - Danløn revokes access on the OAuth2 server
+  - Danløn redirects user to your revoke endpoint with a return_uri
+  - Your app cleans up and redirects back to the return_uri
+  
+  **Disconnect Scenario 2 (initiated from your app - THIS request):**
+  - You revoke access via this POST call
+  - On success, delete persisted tokens and clean up
+  - The connection can be re-established later using Steps 1-4
+  
+  **Parameters:**
+  - client_id: Your client ID
+  - client_secret: Your client secret
+  - token: The refresh token to revoke
+}

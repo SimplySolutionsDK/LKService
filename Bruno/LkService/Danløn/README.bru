@@ -1,0 +1,184 @@
+meta {
+  name: README - Authentication Guide
+  type: http
+  seq: 0
+}
+
+get {
+  url: https://api-demo.danlon.dk/graphql
+  body: none
+  auth: none
+}
+
+docs {
+  # Danløn API Integration Guide
+  
+  ## Overview
+  
+  Danløn uses a multi-step OAuth2 authorization code flow to connect your application.
+  Once connected, you use a refresh token to get short-lived access tokens for API calls.
+  
+  ---
+  
+  ## Connection Flow (Steps 1-4)
+  
+  The connection flow involves browser redirects between your app and Danløn.
+  
+  ### Step 1: Get Authorization Code (Browser Redirect)
+  - Redirect user to Danløn's OAuth2 auth endpoint
+  - User logs in and gives consent
+  - OAuth2 server redirects back to your redirect_uri with a `code`
+  - **Scope must be:** `openid email offline_access`
+  
+  ### Step 2: Exchange Code for Temporary Token (Server-to-Server POST)
+  - POST the `code` to Danløn's token endpoint
+  - Include client_id, client_secret, and redirect_uri
+  - Returns **temporary** access_token and refresh_token
+  - The temporary access_token is used in Step 3
+  
+  ### Step 3: Select Company (Browser Redirect)
+  - Redirect user to Danløn's select-company page
+  - Pass the temporary access_token (base64-encoded) as `token` param
+  - User selects which company to connect (skipped if only one company)
+  - Danløn redirects back with: `code`, `company_id` (base64), `return_uri`
+  - At this point, temporary tokens are revoked
+  
+  ### Step 4: Code to Final Tokens (Server-to-Server GET)
+  - GET call to Danløn's code2token endpoint with the code from Step 3
+  - Returns **final** access_token and refresh_token
+  - **PERSIST the refresh_token** - this is your long-lived access to the API
+  - Do NOT persist anything until you reach this step
+  
+  ---
+  
+  ## Disconnect Flow (Step 5)
+  
+  ### Scenario 1: User disconnects from Danløn
+  - Danløn revokes tokens on the OAuth2 server
+  - Danløn redirects user to your revoke endpoint with a return_uri
+  - Clean up locally (delete tokens, disable services)
+  - Redirect user back to the return_uri
+  
+  ### Scenario 2: User disconnects from your app
+  - POST to Danløn's revoke endpoint (Step 5) with client_id, client_secret, and refresh_token
+  - On success, delete your persisted tokens and clean up
+  - Important: If you only delete tokens locally without revoking, Danløn still shows access as granted
+  
+  ---
+  
+  ## Regular API Usage (Steps 6-10)
+  
+  ### Step 6: Refresh Token (Every session)
+  - Exchange refresh_token for new access_token
+  - Access tokens expire after **5 MINUTES**
+  - Run this before every API session
+  
+  ### Steps 7-10: GraphQL API Calls
+  - 7: Get Companies by ID
+  - 8: Get Company Details & Employees
+  - 9: Get PayPart Meta
+  - 10: Create PayParts (Mutation)
+  
+  ---
+  
+  ## Quick Start
+  
+  ### First Time (Connect):
+  ```
+  1. Run Step 1: Browser redirect to get authorization code
+  2. Copy the 'code' from redirect URL
+  3. Run Step 2: Exchange code for temporary token
+  4. Run Step 3: Browser redirect for company selection
+  5. Copy 'code' and 'company_id' from redirect URL
+  6. Run Step 4: Exchange code for final tokens
+  7. Your refresh_token is now stored - connection established!
+  ```
+  
+  ### Every Time (API Calls):
+  ```
+  1. Run Step 6: Refresh Token (get fresh access_token)
+  2. Run Steps 7-10: Make GraphQL API calls
+  3. If token expires (5 min), go back to Step 6
+  ```
+  
+  ---
+  
+  ## Environment Setup
+  
+  ### Demo Environment
+  - Select environment: **Demo**
+  - Base URL: https://danlon-integration-demo.lessor.dk
+  - Client: partner-showcase
+  - Test user: simplysolutions / s5zC4uVFrJgGBYhMfybV
+  - GraphQL: https://api-demo.danlon.dk/graphql
+  
+  **Set these secrets manually in Demo environment:**
+  - `danlon_client_secret`: ZwgcjNrJcspNCTFWDhtL4rgAyPTa4s82
+  - `danlon_password`: s5zC4uVFrJgGBYhMfybV
+  
+  ### Production Environment
+  - Select environment: **Prod**
+  - Base URL: https://danlon.lessor.dk
+  - Client: simplysolutions
+  - GraphQL: https://api.danlon.dk/graphql
+  
+  **Set these secrets manually in Prod environment:**
+  - `danlon_client_secret`: oFqALlksfa3xK2CcQJXbXXaofXDH79Qd
+  
+  ---
+  
+  ## URL Reference
+  
+  ### Demo URLs
+  - Auth Connect: https://auth.lessor.dk/auth/realms/danlon-integration-demo/protocol/openid-connect/auth
+  - Token Exchange: https://auth.lessor.dk/auth/realms/danlon-integration-demo/protocol/openid-connect/token
+  - Revoke: https://auth.lessor.dk/auth/realms/danlon-integration-demo/protocol/openid-connect/revoke
+  - Select Company: https://danlon-integration-demo.lessor.dk/select-company
+  - Code2Token: https://danlon-integration-demo.lessor.dk/code2token
+  - GraphQL: https://api-demo.danlon.dk/graphql
+  
+  ### Prod URLs
+  - Auth Connect: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/auth
+  - Token Exchange: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/token
+  - Revoke: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/revoke
+  - Select Company: https://danlon.lessor.dk/select-company
+  - Code2Token: https://danlon.lessor.dk/code2token
+  - GraphQL: https://api.danlon.dk/graphql
+  
+  ---
+  
+  ## Important Notes
+  
+  **Access Token Expiration**
+  - Access tokens expire after 5 MINUTES
+  - Always run Step 6 before making API calls
+  - If you get 401 errors, your token expired - refresh it
+  
+  **Refresh Token Storage**
+  - Refresh tokens are long-lived
+  - Store them securely
+  - Only need to run Steps 1-4 once per user/company
+  
+  **Stateless Until Final Token**
+  - Do NOT persist anything until Step 4 returns the final refresh_token
+  - Users can drop out mid-flow and start over
+  
+  **Re-establishing Connections**
+  - Implement connect/disconnect so connections can be re-established after disconnection
+  
+  ---
+  
+  ## Troubleshooting
+  
+  **401 Unauthorized**
+  - Token expired. Run Step 6 to refresh.
+  
+  **400 Bad Request on Step 6**
+  - Refresh token expired/invalid. Run Steps 1-4 to reconnect.
+  
+  **Missing environment variables**
+  - Set client_secret and other secrets manually in environment settings.
+  
+  **Danløn still shows access as granted after disconnect**
+  - You must revoke via Step 5, not just delete tokens locally.
+}

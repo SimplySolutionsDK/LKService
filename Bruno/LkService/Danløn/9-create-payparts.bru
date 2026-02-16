@@ -1,0 +1,139 @@
+meta {
+  name: 10. Create PayParts (Mutation)
+  type: graphql
+  seq: 10
+}
+
+post {
+  url: {{danlon_graphql_url}}
+  body: graphql
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+body:graphql {
+  mutation CreatePayParts($companyId: String!, $payParts: [PayPartInput!]!) {
+    createPayParts(input: {
+      companyId: $companyId,
+      payParts: $payParts
+    }) {
+      createdPayParts {
+        id
+        code
+        units
+        rate
+        amount
+        employee {
+          id
+          name
+          email
+        }
+        company {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "companyId": "{{company_id}}",
+    "payParts": [
+      {
+        "employeeId": "{{employee_id}}",
+        "code": "T1",
+        "units": 8,
+        "rate": 250,
+        "amount": 2000
+      }
+    ]
+  }
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    if (response.data && response.data.createPayParts) {
+      const created = response.data.createPayParts.createdPayParts;
+      console.log(`✓ Successfully created ${created.length} pay part(s)`);
+      
+      // Display created pay parts
+      created.forEach(payPart => {
+        console.log(`\nPay Part ID: ${payPart.id}`);
+        console.log(`  Employee: ${payPart.employee.name} (${payPart.employee.id})`);
+        console.log(`  Company: ${payPart.company.name}`);
+        console.log(`  Code: ${payPart.code}`);
+        console.log(`  Units: ${payPart.units}, Rate: ${payPart.rate}, Amount: ${payPart.amount}`);
+      });
+    }
+    
+    if (response.errors) {
+      console.error("✗ GraphQL errors:", JSON.stringify(response.errors, null, 2));
+    }
+  } else {
+    console.error("✗ Mutation failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+    if (res.status === 401) {
+      console.error("⚠ Token expired. Run Step 6 to refresh.");
+    }
+  }
+}
+
+docs {
+  # Create PayParts Mutation
+  
+  Creates new pay parts for employees in a company.
+  
+  **Prerequisites:**
+  - Run Step 6 (Refresh Token) to get valid access_token
+  - Token must be less than 5 minutes old
+  - Have valid company ID and employee ID(s)
+  - Know the pay part code (use Step 8 to get available codes)
+  
+  **Input Fields:**
+  - companyId: Company identifier
+  - payParts: Array of pay parts to create
+    - employeeId: Employee identifier
+    - code: Pay part type code (e.g., "T1")
+    - units: Number of units (if allowed for this code)
+    - rate: Rate per unit (if allowed for this code)
+    - amount: Total amount (if allowed for this code)
+  
+  **Variables Example:**
+  ```json
+  {
+    "companyId": "your-company-id",
+    "payParts": [
+      {
+        "employeeId": "employee-id-1",
+        "code": "T1",
+        "units": 8,
+        "rate": 250,
+        "amount": 2000
+      },
+      {
+        "employeeId": "employee-id-2",
+        "code": "T1",
+        "units": 10,
+        "rate": 200,
+        "amount": 2000
+      }
+    ]
+  }
+  ```
+  
+  **Note:**
+  Update the variables section with your actual company and employee IDs.
+  Use Step 7 to get company/employee IDs and Step 8 to get valid pay part codes.
+}

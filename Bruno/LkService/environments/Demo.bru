@@ -7,9 +7,12 @@ vars {
   danlon_select_company_url: https://danlon-integration-demo.lessor.dk/select-company
   danlon_code2token_url: https://danlon-integration-demo.lessor.dk/code2token
   danlon_graphql_url: https://api-demo.danlon.dk/graphql
+  danlon_revoke_url: https://auth.lessor.dk/auth/realms/danlon-integration-demo/protocol/openid-connect/revoke
   danlon_client_id: partner-showcase
   danlon_username: simplysolutions
   danlon_redirect_uri: http://localhost:3000/callback
+  company_id: 1
+  employee_id: MV8xXzE=
   tokenValidTo: 
 }
 vars:secret [
@@ -19,5 +22,6 @@ vars:secret [
   danlon_password,
   danlon_access_token,
   danlon_refresh_token,
+  danlon_id_token,
   danlon_authorization_code
 ]

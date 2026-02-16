@@ -1,0 +1,128 @@
+meta {
+  name: 7. Get Companies by ID
+  type: graphql
+  seq: 7
+}
+
+post {
+  url: {{danlon_graphql_url}}
+  body: graphql
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+body:graphql {
+  query GetCompanies($companyIds: [String!]!) {
+    companiesExt(input: {companyIds: $companyIds}) {
+      companies {
+        id
+        name
+        vatId
+        address {
+          street
+          street2
+          postalCode
+          city
+          countryCode
+          country
+        }
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "companyIds": ["{{company_id}}"]
+  }
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    if (response.data && response.data.companiesExt) {
+      const companies = response.data.companiesExt.companies;
+      
+      if (companies && companies.length > 0) {
+        console.log(`✓ Found ${companies.length} company/companies\n`);
+        
+        companies.forEach((company, index) => {
+          console.log(`${index + 1}. ${company.name}`);
+          console.log(`   ID: ${company.id}`);
+          console.log(`   VAT: ${company.vatId || 'N/A'}`);
+          if (company.address) {
+            console.log(`   Location: ${company.address.city || 'N/A'}, ${company.address.country || 'N/A'}`);
+          }
+          console.log('');
+        });
+        
+        // Auto-store the first company ID for convenience
+        if (companies[0].id) {
+          bru.setEnvVar("company_id", companies[0].id);
+          console.log(`✓ First company ID stored in 'company_id' variable: ${companies[0].id}`);
+          console.log("  (You can use this in other queries)\n");
+        }
+      } else {
+        console.log("⚠ No companies found for this user");
+      }
+    }
+    
+    if (response.errors) {
+      console.error("✗ GraphQL errors:");
+      console.error(JSON.stringify(response.errors, null, 2));
+    }
+  } else {
+    console.error("✗ Query failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+    
+    if (res.status === 401) {
+      console.error("\n⚠ Authentication failed - Token may be expired");
+      console.error("→ Run Step 6 to refresh your access token");
+    }
+  }
+}
+
+docs {
+  # Get Company Information by ID
+  
+  **IMPORTANT: Run Step 6 first to refresh your access token!**
+  
+  **IMPORTANT: You need to know your company ID(s) first!**
+  
+  The Danløn API requires you to specify company IDs - there's no "list all" endpoint.
+  You should receive your company ID(s) from Danløn when they set up your integration.
+  
+  **How to get your Company ID:**
+  1. Contact Danløn support or your account manager
+  2. Check your integration documentation
+  3. Or manually set the company_id in your environment variables
+  
+  **Prerequisites:**
+  - Valid refresh_token (from Steps 1-2)
+  - Fresh access_token (run Step 6)
+  - Know your company ID(s)
+  
+  **To use this query:**
+  1. Set the `company_id` variable in your environment (Demo or Prod)
+  2. Or update the companyIds array in the variables section
+  3. Run the query
+  
+  **Response:**
+  Returns company details:
+  - id: Company identifier
+  - name: Company name
+  - vatId: VAT/CVR number
+  - address: Full company address
+  
+  **Example company IDs (from Danløn docs):**
+  - Demo/Test: "MV8x"
+}

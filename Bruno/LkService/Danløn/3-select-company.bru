@@ -1,68 +1,72 @@
 meta {
-  name: 3. Select Company
+  name: 3. Select Company (Browser Redirect)
   type: http
   seq: 3
 }
 
-post {
-  url: {{danlon_select_company_url}}
-  body: json
-  auth: bearer
+get {
+  url: {{danlon_select_company_url}}?token={{danlon_access_token_b64}}&return_uri={{danlon_redirect_uri}}
+  body: none
+  auth: none
 }
 
-auth:bearer {
-  token: {{danlon_access_token}}
+params:query {
+  token: {{danlon_access_token_b64}}
+  return_uri: {{danlon_redirect_uri}}
 }
 
-headers {
-  Content-Type: application/json
-}
-
-body:json {
-  {
-    "companyId": "{{company_id}}"
+script:pre-request {
+  // Base64 encode the temporary access token for the select-company redirect
+  const accessToken = bru.getEnvVar("danlon_access_token");
+  if (accessToken) {
+    const b64Token = Buffer.from(accessToken).toString('base64');
+    bru.setEnvVar("danlon_access_token_b64", b64Token);
+    console.log("✓ Access token base64-encoded for select-company redirect");
+  } else {
+    console.error("✗ No access token found. Run Step 2 first.");
   }
-}
-
-docs {
-  # Select Company Context
-  
-  This endpoint allows you to select a company context for subsequent API calls.
-  
-  **Prerequisites:**
-  - Must have completed Step 2 (Token Exchange)
-  - danlon_access_token must be set in environment variables
-  
-  **Request Body:**
-  - companyId: The ID of the company you want to work with
-  
-  **Note:** You may need to first call the GraphQL API to get a list of available companies
-  for the authenticated user before you can select one.
-  
-  **Response:**
-  The response will confirm the selected company context. This context will be used
-  for subsequent API calls.
 }
 
 script:post-response {
-  const response = res.getBody();
+  // After the user selects a company, Danløn redirects back to your return_uri
+  // with three parameters: return_uri, code, and company_id (base64-encoded)
+  // 
+  // Example redirect: partner.com/success?return_uri=...&code=ABC123&company_id=TVZfMQ==
+  //
+  // Manual step required:
+  // 1. Open this URL in browser
+  // 2. Select the company
+  // 3. Extract 'code' and 'company_id' from the redirect URL
+  // 4. Set them in environment variables
   
-  if (response && res.status === 200) {
-    // Store company context if provided in response
-    if (response.companyId) {
-      bru.setEnvVar("danlon_selected_company_id", response.companyId);
-      console.log(`✓ Company selected: ${response.companyId}`);
-    }
-    
-    if (response.companyName) {
-      bru.setEnvVar("danlon_selected_company_name", response.companyName);
-      console.log(`✓ Company name: ${response.companyName}`);
-    }
-    
-    console.log("✓ Company selection successful");
-  } else {
-    console.error("✗ Company selection failed");
-    console.error("Status:", res.status);
-    console.error("Response:", response);
-  }
+  console.log("Open this URL in browser to select company");
+  console.log("After selecting, extract 'code' and 'company_id' from redirect URL");
+  console.log("Set danlon_authorization_code = <code from redirect>");
+  console.log("Set company_id = <decoded company_id from redirect>");
+  console.log("\nThen run Step 4 to exchange the code for final tokens.");
+}
+
+docs {
+  # Select Company (Danløn Doc Step 6-7)
+  
+  If the user is associated with multiple companies in Danløn, they must choose which 
+  company to connect with. This is a **browser redirect** to Danløn's select-company page.
+  
+  **Flow:**
+  1. The temporary access token (from Step 2) is base64-encoded automatically
+  2. User is redirected to the select-company page
+  3. User selects a company (if only one company, this step is automatic)
+  4. Danløn redirects back to your return_uri with: `code`, `company_id` (base64), and `return_uri`
+  5. The temporary access and refresh tokens are revoked at this point
+  6. The `code` is associated with the final tokens for the selected company
+  
+  **After redirect, extract from the URL:**
+  - `code` → set as `danlon_authorization_code` (used in Step 4)
+  - `company_id` → decode from base64, set as `company_id`
+  
+  **Note:** Since Bruno doesn't handle browser redirects, copy the URL and open it in a browser.
+  
+  **Parameters:**
+  - token: Base64-encoded temporary access token (auto-encoded by pre-request script)
+  - return_uri: URL where Danløn will redirect after company selection
 }

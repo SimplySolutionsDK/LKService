@@ -1,0 +1,81 @@
+meta {
+  name: 9. Get PayPart Meta
+  type: graphql
+  seq: 9
+}
+
+post {
+  url: {{danlon_graphql_url}}
+  body: graphql
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+body:graphql {
+  query GetPayPartsMeta {
+    payPartsMeta {
+      payPartsMeta {
+        code
+        description
+        unitsAllowed
+        rateAllowed
+        amountAllowed
+      }
+    }
+  }
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    if (response.data && response.data.payPartsMeta) {
+      const metaList = response.data.payPartsMeta.payPartsMeta;
+      console.log(`✓ Found ${metaList.length} pay part types`);
+      
+      // Display summary
+      metaList.forEach(meta => {
+        console.log(`\n${meta.code}: ${meta.description}`);
+        console.log(`  Units: ${meta.unitsAllowed}, Rate: ${meta.rateAllowed}, Amount: ${meta.amountAllowed}`);
+      });
+    }
+    
+    if (response.errors) {
+      console.error("✗ GraphQL errors:", JSON.stringify(response.errors, null, 2));
+    }
+  } else {
+    console.error("✗ Query failed");
+    console.error("Status:", res.status);
+    if (res.status === 401) {
+      console.error("⚠ Token expired. Run Step 6 to refresh.");
+    }
+  }
+}
+
+docs {
+  # Get PayPart Meta Information
+  
+  Fetches metadata about available pay part types, including which fields are allowed for each code.
+  
+  **Prerequisites:**
+  - Run Step 6 (Refresh Token) to get valid access_token
+  - Token must be less than 5 minutes old
+  
+  **Response Fields:**
+  - code: Pay part type code (e.g., "T1")
+  - description: Human-readable description of the pay part
+  - unitsAllowed: Whether units field is allowed for this code
+  - rateAllowed: Whether rate field is allowed for this code
+  - amountAllowed: Whether amount field is allowed for this code
+  
+  **Use Case:**
+  Use this query to discover available pay part types before creating new pay parts.
+  This helps you understand which fields are required/allowed for each pay part code.
+}

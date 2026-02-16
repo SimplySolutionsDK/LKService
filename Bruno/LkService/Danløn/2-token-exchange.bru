@@ -12,6 +12,7 @@ post {
 
 headers {
   Content-Type: application/x-www-form-urlencoded
+  ~Ocp-Apim-Subscription-Key: 
 }
 
 body:form-urlencoded {
@@ -20,6 +21,71 @@ body:form-urlencoded {
   redirect_uri: {{danlon_redirect_uri}}
   client_id: {{danlon_client_id}}
   client_secret: {{danlon_client_secret}}
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    // Store access token
+    if (response.access_token) {
+      bru.setEnvVar("danlon_access_token", response.access_token);
+      console.log("✓ Access token stored");
+    }
+    
+    // Store refresh token (IMPORTANT: This is your long-lived token!)
+    if (response.refresh_token) {
+      bru.setEnvVar("danlon_refresh_token", response.refresh_token);
+      console.log("✓ Refresh token stored (keep this safe!)");
+    }
+    
+    // Store ID token (OpenID Connect)
+    if (response.id_token) {
+      bru.setEnvVar("danlon_id_token", response.id_token);
+      console.log("✓ ID token stored");
+    }
+    
+    // Store session state
+    if (response.session_state) {
+      bru.setEnvVar("danlon_session_state", response.session_state);
+      console.log("✓ Session state stored");
+    }
+    
+    // Store token type
+    if (response.token_type) {
+      bru.setEnvVar("danlon_token_type", response.token_type);
+    }
+    
+    // Store expiry information
+    if (response.expires_in) {
+      const expiryTime = new Date(Date.now() + (response.expires_in * 1000));
+      bru.setEnvVar("danlon_token_expires_at", expiryTime.toISOString());
+      bru.setEnvVar("danlon_token_expires_in", response.expires_in);
+      console.log(`✓ Token expires in: ${response.expires_in} seconds (${response.expires_in / 60} minutes)`);
+      console.log(`✓ Token expires at: ${expiryTime.toISOString()}`);
+    }
+    
+    // Store scope
+    if (response.scope) {
+      bru.setEnvVar("danlon_scope", response.scope);
+      console.log(`✓ Scopes: ${response.scope}`);
+    }
+    
+    console.log("\n========================================");
+    console.log("✓ TOKEN EXCHANGE SUCCESSFUL!");
+    console.log("========================================");
+    console.log("You now have:");
+    console.log("  • access_token (for API calls, expires in 5 min)");
+    console.log("  • refresh_token (to get new access tokens)");
+    console.log("\nNext steps:");
+    console.log("  1. Use Step 6 to refresh access_token when needed");
+    console.log("  2. Use Steps 7-9 to make GraphQL API calls");
+    console.log("========================================\n");
+  } else {
+    console.error("✗ Token exchange failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+  }
 }
 
 docs {
@@ -48,35 +114,4 @@ docs {
   - token_type: Bearer
   
   These tokens are automatically stored in environment variables by the post-response script.
-}
-
-script:post-response {
-  const response = res.getBody();
-  
-  if (response && res.status === 200) {
-    // Store access token
-    if (response.access_token) {
-      bru.setEnvVar("danlon_access_token", response.access_token);
-      console.log("✓ Access token stored");
-    }
-    
-    // Store refresh token
-    if (response.refresh_token) {
-      bru.setEnvVar("danlon_refresh_token", response.refresh_token);
-      console.log("✓ Refresh token stored");
-    }
-    
-    // Store expiry information
-    if (response.expires_in) {
-      const expiryTime = new Date(Date.now() + (response.expires_in * 1000));
-      bru.setEnvVar("danlon_token_expires_at", expiryTime.toISOString());
-      console.log(`✓ Token expires at: ${expiryTime.toISOString()}`);
-    }
-    
-    console.log("✓ Token exchange successful");
-  } else {
-    console.error("✗ Token exchange failed");
-    console.error("Status:", res.status);
-    console.error("Response:", response);
-  }
 }

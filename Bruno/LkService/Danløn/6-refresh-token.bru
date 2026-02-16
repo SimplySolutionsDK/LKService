@@ -1,0 +1,112 @@
+meta {
+  name: 6. Get Access Token (Refresh)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{danlon_token_url}}
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+  ~Ocp-Apim-Subscription-Key: 
+}
+
+body:form-urlencoded {
+  client_id: {{danlon_client_id}}
+  client_secret: {{danlon_client_secret}}
+  grant_type: refresh_token
+  refresh_token: {{danlon_refresh_token}}
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    // Store new access token
+    if (response.access_token) {
+      bru.setEnvVar("danlon_access_token", response.access_token);
+      console.log("✓ New access token stored");
+    }
+    
+    // Update refresh token if a new one is provided
+    if (response.refresh_token) {
+      bru.setEnvVar("danlon_refresh_token", response.refresh_token);
+      console.log("✓ Refresh token updated");
+    }
+    
+    // Store ID token if provided
+    if (response.id_token) {
+      bru.setEnvVar("danlon_id_token", response.id_token);
+      console.log("✓ ID token updated");
+    }
+    
+    // Store session state if provided
+    if (response.session_state) {
+      bru.setEnvVar("danlon_session_state", response.session_state);
+    }
+    
+    // Store expiry information
+    if (response.expires_in) {
+      const expiryTime = new Date(Date.now() + (response.expires_in * 1000));
+      bru.setEnvVar("danlon_token_expires_at", expiryTime.toISOString());
+      bru.setEnvVar("danlon_token_expires_in", response.expires_in);
+      console.log(`✓ Token valid for: ${response.expires_in} seconds (${response.expires_in / 60} minutes)`);
+      console.log(`✓ Token expires at: ${expiryTime.toISOString()}`);
+    }
+    
+    console.log("\n✓ REFRESH SUCCESSFUL - Ready to make GraphQL API calls!");
+  } else {
+    console.error("✗ Token refresh failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+    
+    if (res.status === 400) {
+      console.error("\n⚠ Refresh token may be expired or invalid.");
+      console.error("→ Run Steps 1-2 to get a new refresh token via OAuth2 flow.");
+    }
+  }
+}
+
+docs {
+  # Get Access Token Using Refresh Token
+  
+  This is the PRIMARY authentication method for regular API usage.
+  
+  **When to use this:**
+  - For all regular API calls after initial setup
+  - When your access_token expires (every 5 minutes)
+  - This is faster than the full OAuth2 flow (Steps 1-4)
+  
+  **Prerequisites:**
+  - Must have a valid refresh_token (from Step 2 or stored from previous authentication)
+  - danlon_client_id and danlon_client_secret must be set
+  
+  **Access Token Lifetime:**
+  - Access tokens are valid for only **5 MINUTES**
+  - You need to refresh before each GraphQL API call or when token expires
+  
+  **Complete Authentication Flow:**
+  
+  1. **First Time Setup** (Once per user):
+     - Run Steps 1-4 to get initial refresh_token via OAuth2
+     - Store the refresh_token securely (it's long-lived)
+  
+  2. **Regular API Usage** (Every time):
+     - Run THIS request (Step 6) to get a fresh access_token
+     - Use the access_token for GraphQL API calls (Step 7)
+     - Repeat every 5 minutes or before each API session
+  
+  **Demo Environment:**
+  - client_id: partner-showcase
+  - client_secret: ZwgcjNrJcspNCTFWDhtL4rgAyPTa4s82
+  - token_url: https://auth.lessor.dk/auth/realms/danlon-integration-demo/protocol/openid-connect/token
+  
+  **Production Environment:**
+  - client_id: simplysolutions
+  - client_secret: oFqALlksfa3xK2CcQJXbXXaofXDH79Qd
+  - token_url: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/token
+}
