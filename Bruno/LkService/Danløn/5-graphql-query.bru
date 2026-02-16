@@ -1,0 +1,141 @@
+meta {
+  name: 5. GraphQL Query
+  type: graphql
+  seq: 5
+}
+
+post {
+  url: {{danlon_graphql_url}}
+  body: graphql
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:graphql {
+  query GetEmployees {
+    employees {
+      id
+      firstName
+      lastName
+      email
+      employeeNumber
+      department
+      position
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    
+  }
+}
+
+docs {
+  # GraphQL API Query
+  
+  This endpoint provides access to the Danløn GraphQL API for querying data.
+  
+  **Prerequisites:**
+  - Must have completed Steps 1-2 (OAuth2 authentication)
+  - danlon_access_token must be set and valid
+  - Company context should be selected (Step 3) if required by the API
+  
+  **Demo GraphQL URL:**
+  - https://api-demo.danlon.dk/graphql
+  
+  **Production GraphQL URL:**
+  - https://api.danlon.dk/graphql
+  
+  **Example Queries:**
+  
+  1. Get Employees:
+  ```graphql
+  query GetEmployees {
+    employees {
+      id
+      firstName
+      lastName
+      email
+      employeeNumber
+    }
+  }
+  ```
+  
+  2. Get Time Registrations:
+  ```graphql
+  query GetTimeRegistrations($startDate: String!, $endDate: String!) {
+    timeRegistrations(startDate: $startDate, endDate: $endDate) {
+      id
+      employeeId
+      date
+      hours
+      activity
+      description
+    }
+  }
+  ```
+  
+  3. Get Companies:
+  ```graphql
+  query GetCompanies {
+    companies {
+      id
+      name
+      organizationNumber
+    }
+  }
+  ```
+  
+  **Variables:**
+  Variables can be added in the "body:graphql:vars" section.
+  Example:
+  ```json
+  {
+    "startDate": "2026-01-01",
+    "endDate": "2026-01-31"
+  }
+  ```
+  
+  **Note:** The actual GraphQL schema and available queries depend on the Danløn API
+  documentation. Update the query based on the specific data you need to fetch.
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    if (response.data) {
+      console.log("✓ GraphQL query successful");
+      console.log("Data received:", JSON.stringify(response.data, null, 2));
+      
+      // Store data in environment if needed
+      // Example: if fetching companies list
+      if (response.data.companies && response.data.companies.length > 0) {
+        const firstCompany = response.data.companies[0];
+        bru.setEnvVar("company_id", firstCompany.id);
+        console.log(`✓ First company ID stored: ${firstCompany.id}`);
+      }
+      
+      // Example: if fetching employees
+      if (response.data.employees && response.data.employees.length > 0) {
+        console.log(`✓ Found ${response.data.employees.length} employees`);
+      }
+    }
+    
+    if (response.errors) {
+      console.error("✗ GraphQL errors:", JSON.stringify(response.errors, null, 2));
+    }
+  } else {
+    console.error("✗ GraphQL query failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+  }
+}

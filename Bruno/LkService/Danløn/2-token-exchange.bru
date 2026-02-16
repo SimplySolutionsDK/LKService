@@ -1,0 +1,82 @@
+meta {
+  name: 2. Exchange Code for Token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{danlon_token_url}}
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  grant_type: authorization_code
+  code: {{danlon_authorization_code}}
+  redirect_uri: {{danlon_redirect_uri}}
+  client_id: {{danlon_client_id}}
+  client_secret: {{danlon_client_secret}}
+}
+
+docs {
+  # OAuth2 Authorization Code Flow - Step 2
+  
+  Exchange the authorization code for an access token.
+  
+  **Prerequisites:**
+  - Must have completed Step 1 (Get Authorization Code)
+  - danlon_authorization_code must be set in environment variables
+  - danlon_client_secret must be set in environment secrets
+  
+  **Demo Environment Credentials:**
+  - client_id: partner-showcase
+  - client_secret: ZwgcjNrJcspNCTFWDhtL4rgAyPTa4s82
+  
+  **Production Environment Credentials:**
+  - client_id: simplysolutions
+  - client_secret: oFqALlksfa3xK2CcQJXbXXaofXDH79Qd
+  
+  **Response:**
+  The response will include:
+  - access_token: Bearer token for API requests
+  - refresh_token: Token to refresh access token
+  - expires_in: Token validity duration in seconds
+  - token_type: Bearer
+  
+  These tokens are automatically stored in environment variables by the post-response script.
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    // Store access token
+    if (response.access_token) {
+      bru.setEnvVar("danlon_access_token", response.access_token);
+      console.log("✓ Access token stored");
+    }
+    
+    // Store refresh token
+    if (response.refresh_token) {
+      bru.setEnvVar("danlon_refresh_token", response.refresh_token);
+      console.log("✓ Refresh token stored");
+    }
+    
+    // Store expiry information
+    if (response.expires_in) {
+      const expiryTime = new Date(Date.now() + (response.expires_in * 1000));
+      bru.setEnvVar("danlon_token_expires_at", expiryTime.toISOString());
+      console.log(`✓ Token expires at: ${expiryTime.toISOString()}`);
+    }
+    
+    console.log("✓ Token exchange successful");
+  } else {
+    console.error("✗ Token exchange failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+  }
+}

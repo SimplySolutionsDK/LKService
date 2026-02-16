@@ -1,9 +1,21 @@
 vars {
   CoreURL: https://apigw.ftzplus.dk/external/coreapi/api/
   TimeURL: https://apigw.ftzplus.dk/external/timeregistrationapi/api/
+  danlon_base_url: https://danlon.lessor.dk
+  danlon_auth_url: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/auth
+  danlon_token_url: https://auth.lessor.dk/auth/realms/danlon/protocol/openid-connect/token
+  danlon_select_company_url: https://danlon.lessor.dk/select-company
+  danlon_code2token_url: https://danlon.lessor.dk/code2token
+  danlon_graphql_url: https://api.danlon.dk/graphql
+  danlon_client_id: simplysolutions
+  danlon_redirect_uri: http://localhost:3000/callback
   tokenValidTo: 
 }
 vars:secret [
   token,
-  Ocp-Apim-Subscription-Key
+  Ocp-Apim-Subscription-Key,
+  danlon_client_secret,
+  danlon_access_token,
+  danlon_refresh_token,
+  danlon_authorization_code
 ]

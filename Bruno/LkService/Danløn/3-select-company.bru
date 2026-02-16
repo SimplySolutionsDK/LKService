@@ -1,0 +1,68 @@
+meta {
+  name: 3. Select Company
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{danlon_select_company_url}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "companyId": "{{company_id}}"
+  }
+}
+
+docs {
+  # Select Company Context
+  
+  This endpoint allows you to select a company context for subsequent API calls.
+  
+  **Prerequisites:**
+  - Must have completed Step 2 (Token Exchange)
+  - danlon_access_token must be set in environment variables
+  
+  **Request Body:**
+  - companyId: The ID of the company you want to work with
+  
+  **Note:** You may need to first call the GraphQL API to get a list of available companies
+  for the authenticated user before you can select one.
+  
+  **Response:**
+  The response will confirm the selected company context. This context will be used
+  for subsequent API calls.
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    // Store company context if provided in response
+    if (response.companyId) {
+      bru.setEnvVar("danlon_selected_company_id", response.companyId);
+      console.log(`✓ Company selected: ${response.companyId}`);
+    }
+    
+    if (response.companyName) {
+      bru.setEnvVar("danlon_selected_company_name", response.companyName);
+      console.log(`✓ Company name: ${response.companyName}`);
+    }
+    
+    console.log("✓ Company selection successful");
+  } else {
+    console.error("✗ Company selection failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+  }
+}

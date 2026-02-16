@@ -1,0 +1,80 @@
+meta {
+  name: 4. Code to Token (Alternative)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{danlon_code2token_url}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "code": "{{danlon_authorization_code}}"
+  }
+}
+
+docs {
+  # Alternative Code to Token Exchange
+  
+  This is an alternative endpoint for exchanging an authorization code for tokens.
+  This endpoint may be specific to the Danløn integration demo environment.
+  
+  **Prerequisites:**
+  - danlon_authorization_code must be set in environment variables
+  - May require an existing access token (from Step 2) for authentication
+  
+  **Request Body:**
+  - code: The authorization code obtained from Step 1
+  
+  **Use Case:**
+  This endpoint might be used for:
+  - Simplified token exchange in demo/test environments
+  - Additional token validation or exchange scenarios
+  - Integration-specific authentication flows
+  
+  **Response:**
+  Similar to the standard token exchange, this should return:
+  - access_token
+  - refresh_token (if applicable)
+  - expires_in
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    // Store tokens if provided
+    if (response.access_token) {
+      bru.setEnvVar("danlon_access_token", response.access_token);
+      console.log("✓ Access token updated from code2token");
+    }
+    
+    if (response.refresh_token) {
+      bru.setEnvVar("danlon_refresh_token", response.refresh_token);
+      console.log("✓ Refresh token updated");
+    }
+    
+    if (response.expires_in) {
+      const expiryTime = new Date(Date.now() + (response.expires_in * 1000));
+      bru.setEnvVar("danlon_token_expires_at", expiryTime.toISOString());
+      console.log(`✓ Token expires at: ${expiryTime.toISOString()}`);
+    }
+    
+    console.log("✓ Code2Token exchange successful");
+  } else {
+    console.error("✗ Code2Token exchange failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+  }
+}
