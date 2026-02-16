@@ -14,7 +14,7 @@ Before starting, ensure:
 
 ### 1. Configure Environment
 
-Create or update `.env` file:
+Create or update the **root** `.env` file (NOT `frontend/.env local`):
 
 ```bash
 # Danløn Demo Configuration
@@ -26,6 +26,11 @@ APP_BASE_URL=http://localhost:8000
 # Database (auto-creates SQLite)
 # DATABASE_URL=sqlite+aiosqlite:///./lkservice.db
 ```
+
+**Important:** 
+- Danløn configuration goes in the **root `.env`** (for the FastAPI backend)
+- Frontend variables are in `frontend/.env local` (for API endpoints)
+- You do NOT need to add Danløn variables to the frontend's env file
 
 ### 2. Start Application
 
@@ -71,9 +76,16 @@ ls lkservice.db
 ```bash
 # Optional: inspect database
 sqlite3 lkservice.db
-> .tables
-> SELECT * FROM danlon_tokens;
-> .quit
+
+# Then inside sqlite3, run these commands:
+.tables
+SELECT * FROM danlon_tokens;
+.quit
+```
+
+Or as a one-liner:
+```bash
+sqlite3 lkservice.db "SELECT * FROM danlon_tokens;"
 ```
 
 Should show `danlon_tokens` table (empty initially).
@@ -86,24 +98,31 @@ Navigate to: http://localhost:8000
 
 You should see:
 - Main upload interface
-- "🔗 Danløn Integration" section (expandable)
+- Settings gear icon (⚙️) in the top right corner
 
-### 2.2 Check Initial Connection Status
+### 2.2 Open Settings Menu
 
-1. Expand "Danløn Integration" section
-2. Should show:
-   - "Not Connected" status
-   - Blue info box
-   - "Connect to Danløn" button
+1. Click the **⚙️ Settings** icon in the top right corner
+2. Settings menu should appear with two tabs:
+   - "⚙️ Generelt" (General)
+   - "🔗 Danløn Integration"
+3. Click the **"🔗 Danløn Integration"** tab
 
-### 2.3 Initiate Connection
+### 2.3 Check Initial Connection Status
+
+In the Danløn Integration tab, you should see:
+- "Not Connected" status
+- Blue info box
+- "Connect to Danløn" button
+
+### 2.4 Initiate Connection
 
 Click **"Connect to Danløn"** button
 
 **Expected:** Redirect to Danløn login page
 - URL should be: `https://auth.lessor.dk/auth/realms/danlon-integration-demo/...`
 
-### 2.4 Login to Danløn
+### 2.5 Login to Danløn
 
 Use demo credentials:
 - **Username:** `simplysolutions`
@@ -111,13 +130,13 @@ Use demo credentials:
 
 Click **Login**
 
-### 2.5 Give Consent
+### 2.6 Give Consent
 
 Danløn will ask for consent:
 - Review permissions
 - Click **"Allow"** or **"Grant Access"**
 
-### 2.6 Select Company
+### 2.7 Select Company
 
 If account has multiple companies:
 - Select the company you want to connect
@@ -125,19 +144,19 @@ If account has multiple companies:
 
 **Expected:** Redirect back to your app
 
-### 2.7 Verify Success
+### 2.8 Verify Success
 
 You should see:
 - Success page OR
 - Redirect to app with "Connected to Danløn" green status
 
-Check the Danløn Integration section:
+Open the **Settings menu** (⚙️) and go to the **Danløn Integration** tab:
 - ✓ Green "Connected to Danløn" box
 - Company name displayed
 - Company ID shown
 - Token expiry time shown
 
-### 2.8 Verify Database Storage
+### 2.9 Verify Database Storage
 
 ```bash
 sqlite3 lkservice.db
@@ -224,9 +243,10 @@ Check that you see:
 ### 5.1 Using Web Interface
 
 1. Ensure you have preview data (from Phase 4)
-2. In "Danløn Integration" section
-3. Look for "📤 Sync to Danløn" card
-4. Should show:
+2. Open the **Settings menu** (⚙️) in the top right corner
+3. Click the **"🔗 Danløn Integration"** tab
+4. Look for "📤 Sync to Danløn" card
+5. Should show:
    - Connected status
    - "Sync to Danløn" button enabled
 
@@ -244,7 +264,7 @@ Confirm the dialog
 
 ### 5.2 Review Sync Results
 
-Check the results panel:
+Check the results panel in the settings menu:
 - ✓ Green success box
 - Number of payparts created
 - If any were skipped, click "Show Details" to see why
@@ -332,9 +352,10 @@ sqlite3 lkservice.db
 ### 8.1 Disconnect from App
 
 In the web interface:
-1. Danløn Integration section
-2. Click "🔌 Disconnect" button
-3. Confirm
+1. Open the **Settings menu** (⚙️)
+2. Go to **"🔗 Danløn Integration"** tab
+3. Click "🔌 Disconnect" button
+4. Confirm
 
 **Expected:**
 - Success message
@@ -352,7 +373,7 @@ Should return no rows (tokens deleted).
 
 ### 8.3 Reconnect
 
-Click "Connect to Danløn" again
+In the **Settings menu** (⚙️) > **Danløn Integration** tab, click "Connect to Danløn" again
 
 Should go through OAuth flow again (already logged in, might skip login screen).
 

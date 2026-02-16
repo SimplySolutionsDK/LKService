@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import logging
 from contextlib import asynccontextmanager
 
-from app.routers import upload, api_fetch, danlon_oauth, danlon_integration_example
+from app.routers import upload, api_fetch, danlon_oauth, danlon_integration_example, danlon_test
 from app.database import init_db, close_db
 
 # Load environment variables from .env file
@@ -51,6 +51,7 @@ app.include_router(upload.router)
 app.include_router(api_fetch.router)
 app.include_router(danlon_oauth.router)
 app.include_router(danlon_integration_example.router)
+app.include_router(danlon_test.router)
 
 # Mount static files from the built frontend (only if dist exists)
 if FRONTEND_DIST.exists():

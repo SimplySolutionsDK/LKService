@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Status } from '../ui/Status';
 
 interface SyncResult {
   success: boolean;

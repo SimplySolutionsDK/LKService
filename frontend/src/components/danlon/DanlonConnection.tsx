@@ -15,12 +15,11 @@ export function DanlonConnection() {
   const [status, setStatus] = useState<ConnectionStatus>({ connected: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [companyId, setCompanyId] = useState('');
 
   const checkConnection = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/danlon/status?company_id=${companyId || 'unknown'}`);
+      const response = await fetch('/danlon/status');
       const data = await response.json();
       setStatus(data);
       setError(null);
@@ -121,7 +120,6 @@ export function DanlonConnection() {
             <div className="flex gap-2">
               <Button
                 variant="secondary"
-                size="sm"
                 onClick={checkConnection}
                 disabled={loading}
               >
@@ -129,7 +127,6 @@ export function DanlonConnection() {
               </Button>
               <Button
                 variant="secondary"
-                size="sm"
                 onClick={handleDisconnect}
                 disabled={loading}
               >
