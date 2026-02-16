@@ -19,10 +19,18 @@ auth:bearer {
 }
 
 body:graphql {
-  mutation CreatePayParts($companyId: String!, $payParts: [PayPartInput!]!) {
+  mutation CreatePayParts {
     createPayParts(input: {
-      companyId: $companyId,
-      payParts: $payParts
+      companyId: "{{company_id}}",
+      payParts: [
+        {
+          employeeId: "{{employee_id}}",
+          code: "T1",
+          units: 1,
+          rate: 1000,
+          amount: 2000
+        }
+      ]
     }) {
       createdPayParts {
         id
@@ -41,21 +49,6 @@ body:graphql {
         }
       }
     }
-  }
-}
-
-body:graphql:vars {
-  {
-    "companyId": "{{company_id}}",
-    "payParts": [
-      {
-        "employeeId": "{{employee_id}}",
-        "code": "T1",
-        "units": 8,
-        "rate": 250,
-        "amount": 2000
-      }
-    ]
   }
 }
 
@@ -95,45 +88,56 @@ docs {
   
   Creates new pay parts for employees in a company.
   
+  **IMPORTANT:**
+  This mutation uses inline values (not GraphQL variables) to match Danløn's API documentation.
+  Edit the mutation body directly to change company_id, employee_id, and pay part details.
+  
   **Prerequisites:**
   - Run Step 6 (Refresh Token) to get valid access_token
   - Token must be less than 5 minutes old
-  - Have valid company ID and employee ID(s)
-  - Know the pay part code (use Step 8 to get available codes)
+  - Have valid company ID (run Step 6.5 to get it)
+  - Have valid employee ID (run Step 8 to get employee IDs)
+  - Know the pay part code (run Step 9 to get available codes)
   
-  **Input Fields:**
-  - companyId: Company identifier
-  - payParts: Array of pay parts to create
-    - employeeId: Employee identifier
-    - code: Pay part type code (e.g., "T1")
-    - units: Number of units (if allowed for this code)
-    - rate: Rate per unit (if allowed for this code)
-    - amount: Total amount (if allowed for this code)
+  **How to Use:**
+  1. Run Step 6.5 to get your company ID (stored in {{company_id}} variable)
+  2. Run Step 8 to get employee IDs (first employee stored in {{employee_id}} variable)
+  3. Run Step 9 to see available pay part codes and which fields are allowed
+  4. Edit the mutation body above to update:
+     - companyId: Use {{company_id}} or paste the actual ID
+     - employeeId: Use {{employee_id}} or paste the actual ID
+     - code: Pay part type code (e.g., "T1")
+     - units: Number of units (only if unitsAllowed is true)
+     - rate: Rate per unit (only if rateAllowed is true)
+     - amount: Total amount (only if amountAllowed is true)
+  5. Run this mutation
   
-  **Variables Example:**
-  ```json
-  {
-    "companyId": "your-company-id",
-    "payParts": [
-      {
-        "employeeId": "employee-id-1",
-        "code": "T1",
-        "units": 8,
-        "rate": 250,
-        "amount": 2000
-      },
-      {
-        "employeeId": "employee-id-2",
-        "code": "T1",
-        "units": 10,
-        "rate": 200,
-        "amount": 2000
+  **Example from Danløn Documentation:**
+  ```graphql
+  mutation {
+    createPayParts(input: {
+      companyId: "MV8x",
+      payParts: [
+        {
+          employeeId: "MV8xXzE=",
+          code: "T1",
+          units: 1,
+          rate: 1000,
+          amount: 2000
+        }
+      ]
+    }) {
+      createdPayParts {
+        id
+        code
+        units
+        rate
+        amount
       }
-    ]
+    }
   }
   ```
   
-  **Note:**
-  Update the variables section with your actual company and employee IDs.
-  Use Step 7 to get company/employee IDs and Step 8 to get valid pay part codes.
+  **To Create Multiple PayParts:**
+  Add more objects to the payParts array in the mutation body above.
 }

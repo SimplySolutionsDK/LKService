@@ -73,6 +73,12 @@ docs {
   - Access tokens expire after **5 MINUTES**
   - Run this before every API session
   
+  ### Step 6.5: Get Current Company ID (Optional)
+  - Query: `{current_company{id}}`
+  - Returns the company ID associated with your access token
+  - Useful if you don't have the company ID from Step 3
+  - Automatically stores the ID in the `company_id` variable
+  
   ### Steps 7-10: GraphQL API Calls
   - 7: Get Companies by ID
   - 8: Get Company Details & Employees
@@ -97,8 +103,9 @@ docs {
   ### Every Time (API Calls):
   ```
   1. Run Step 6: Refresh Token (get fresh access_token)
-  2. Run Steps 7-10: Make GraphQL API calls
-  3. If token expires (5 min), go back to Step 6
+  2. (Optional) Run Step 6.5: Get Current Company ID if you need it
+  3. Run Steps 7-10: Make GraphQL API calls
+  4. If token expires (5 min), go back to Step 6
   ```
   
   ---

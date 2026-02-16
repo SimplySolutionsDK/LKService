@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
@@ -6,6 +6,8 @@ import { UploadCard } from './components/upload/UploadCard';
 import { ApiFetchCard } from './components/api-fetch/ApiFetchCard';
 import { PreviewSection } from './components/preview/PreviewSection';
 import { EntriesModal } from './components/modals/EntriesModal';
+import { DanlonConnection } from './components/danlon/DanlonConnection';
+import { DanlonSync } from './components/danlon/DanlonSync';
 import { Button } from './components/ui/Button';
 import { Status } from './components/ui/Status';
 import { useFileUpload } from './hooks/useFileUpload';
@@ -22,6 +24,8 @@ function App() {
   const [selectedRecord, setSelectedRecord] = useState<DailyRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>('api');
+  const [danlonCompanyId, setDanlonCompanyId] = useState<string | undefined>();
+  const [showDanlonSection, setShowDanlonSection] = useState(true);
 
   const {
     previewData,
@@ -75,6 +79,27 @@ function App() {
     setIsModalOpen(false);
     setSelectedRecord(null);
   };
+
+  const handleSyncComplete = () => {
+    // Optionally refresh or show a message
+    console.log('Sync completed successfully');
+  };
+
+  // Check Danløn connection status on mount
+  useEffect(() => {
+    const checkDanlonConnection = async () => {
+      try {
+        const response = await fetch('/danlon/status');
+        const data = await response.json();
+        if (data.connected && data.company_id) {
+          setDanlonCompanyId(data.company_id);
+        }
+      } catch (err) {
+        console.error('Failed to check Danløn connection:', err);
+      }
+    };
+    checkDanlonConnection();
+  }, []);
 
   return (
     <div className="w-full max-w-[1400px] animate-fade-in">
@@ -148,6 +173,31 @@ function App() {
             <small>Satser gældende fra 1. marts 2026</small>
           </div>
         </form>
+
+        {/* Danløn Integration Section */}
+        <div className="mt-6">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-lg font-semibold text-slate-200 hover:text-accent transition-colors mb-4"
+            onClick={() => setShowDanlonSection(!showDanlonSection)}
+          >
+            <span className="text-2xl">{showDanlonSection ? '▼' : '▶'}</span>
+            <span>🔗 Danløn Integration</span>
+          </button>
+
+          {showDanlonSection && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <DanlonConnection />
+              {previewData && (
+                <DanlonSync
+                  companyId={danlonCompanyId}
+                  hasData={!!previewData}
+                  onSyncComplete={handleSyncComplete}
+                />
+              )}
+            </div>
+          )}
+        </div>
 
         {previewData && (
           <PreviewSection

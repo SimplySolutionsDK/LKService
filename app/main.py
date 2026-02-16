@@ -4,8 +4,10 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
+from contextlib import asynccontextmanager
 
-from app.routers import upload, api_fetch
+from app.routers import upload, api_fetch, danlon_oauth, danlon_integration_example
+from app.database import init_db, close_db
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,19 +18,39 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+logger = logging.getLogger(__name__)
+
 # Get the base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events."""
+    # Startup
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database initialized successfully")
+    yield
+    # Shutdown
+    logger.info("Closing database connections...")
+    await close_db()
+    logger.info("Database connections closed")
+
+
 app = FastAPI(
     title="Time Registration CSV Parser",
     description="Parse and process time registration CSV files with overtime calculations based on Danish automotive industry rules (DBR/Industriens Overenskomst 2026)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Include routers
 app.include_router(upload.router)
 app.include_router(api_fetch.router)
+app.include_router(danlon_oauth.router)
+app.include_router(danlon_integration_example.router)
 
 # Mount static files from the built frontend (only if dist exists)
 if FRONTEND_DIST.exists():

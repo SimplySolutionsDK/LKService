@@ -19,7 +19,7 @@ auth:bearer {
 }
 
 body:graphql {
-  query GetCompanies($companyIds: [String!]!) {
+  query GetCompanies($companyIds: [ID!]!) {
     companiesExt(input: {companyIds: $companyIds}) {
       companies {
         id
@@ -99,12 +99,13 @@ docs {
   **IMPORTANT: You need to know your company ID(s) first!**
   
   The Danløn API requires you to specify company IDs - there's no "list all" endpoint.
-  You should receive your company ID(s) from Danløn when they set up your integration.
   
   **How to get your Company ID:**
-  1. Contact Danløn support or your account manager
-  2. Check your integration documentation
-  3. Or manually set the company_id in your environment variables
+  1. Run Step 6.5 to retrieve the current company ID from your access token
+  2. The company ID is returned in Step 3 during the OAuth flow
+  3. Contact Danløn support or your account manager
+  4. Check your integration documentation
+  5. Or manually set the company_id in your environment variables
   
   **Prerequisites:**
   - Valid refresh_token (from Steps 1-2)

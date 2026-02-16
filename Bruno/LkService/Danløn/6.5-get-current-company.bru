@@ -1,0 +1,91 @@
+meta {
+  name: 6.5. Get Current Company ID
+  type: graphql
+  seq: 6.5
+}
+
+post {
+  url: {{danlon_graphql_url}}
+  body: graphql
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{danlon_access_token}}
+}
+
+body:graphql {
+  query GetCurrentCompany {
+    current_company {
+      id
+    }
+  }
+}
+
+script:post-response {
+  const response = res.getBody();
+  
+  if (response && res.status === 200) {
+    if (response.data && response.data.current_company) {
+      const company = response.data.current_company;
+      
+      console.log(`✓ Current Company ID: ${company.id}`);
+      
+      // Auto-store the company ID for use in other queries
+      bru.setEnvVar("company_id", company.id);
+      console.log(`✓ Company ID stored in 'company_id' variable`);
+      console.log("  (You can now use this in Steps 7-10)\n");
+    } else {
+      console.log("⚠ No current company found");
+    }
+    
+    if (response.errors) {
+      console.error("✗ GraphQL errors:");
+      console.error(JSON.stringify(response.errors, null, 2));
+    }
+  } else {
+    console.error("✗ Query failed");
+    console.error("Status:", res.status);
+    console.error("Response:", response);
+    
+    if (res.status === 401) {
+      console.error("\n⚠ Authentication failed - Token may be expired");
+      console.error("→ Run Step 6 to refresh your access token");
+    }
+  }
+}
+
+docs {
+  # Get Current Company ID
+  
+  **IMPORTANT: Run Step 6 first to refresh your access token!**
+  
+  This query retrieves the company ID associated with your current access token.
+  This is useful when you don't have the company ID stored from the OAuth flow (Step 3).
+  
+  **Prerequisites:**
+  - Valid refresh_token (from Steps 1-4)
+  - Fresh access_token (run Step 6)
+  
+  **How it works:**
+  - Your access token is scoped to a specific company (selected in Step 3)
+  - This query returns the ID of that company
+  - The company ID is automatically stored in the `company_id` variable
+  - You can then use this variable in Steps 7-10
+  
+  **When to use this:**
+  - You completed the OAuth flow but don't have the company ID stored
+  - You want to verify which company the current token is associated with
+  - You need to retrieve the company ID before making other API calls
+  
+  **Response:**
+  Returns just the company ID, which is stored in the `company_id` environment variable
+  for use in subsequent queries (Steps 7-10).
+  
+  **Next steps:**
+  After running this query, you can run Step 7 to get full company details using the stored ID.
+}

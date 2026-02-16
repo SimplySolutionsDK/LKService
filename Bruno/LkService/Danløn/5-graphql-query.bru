@@ -19,7 +19,7 @@ auth:bearer {
 }
 
 body:graphql {
-  query GetCompanyDetailsAndEmployees($companyIds: [String!]!) {
+  query GetCompanyDetailsAndEmployees($companyIds: [ID!]!) {
     companiesExt(input: {companyIds: $companyIds}) {
       companies {
         id
@@ -181,8 +181,8 @@ docs {
   - Company ID (run Step 7 first to get available company IDs)
   
   **How to use:**
-  1. Run Step 7 to get list of companies
-  2. The first company ID is automatically stored in `company_id` variable
+  1. Run Step 6.5 to get your current company ID (automatically stored in `company_id`)
+  2. Or run Step 7 to get company details if you already know the ID
   3. Run this query to get all employees for that company
   4. Or manually update the `company_id` variable with a different company ID
   
