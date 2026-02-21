@@ -23,7 +23,8 @@ from app.services.date_filler import fill_missing_dates
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
-# In-memory storage for preview data (keyed by session ID)
+# In-memory storage for preview data (keyed by session ID).
+# Other routers (e.g. Danløn sync) may import this directly.
 preview_cache: Dict[str, Dict[str, Any]] = {}
 
 

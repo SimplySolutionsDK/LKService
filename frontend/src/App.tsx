@@ -100,11 +100,10 @@ function App() {
 
   return (
     <div className="w-full max-w-[1400px] animate-fade-in">
-      <Header 
+      <Header
         employeeType={employeeType}
         onEmployeeTypeChange={setEmployeeType}
         danlonCompanyId={danlonCompanyId}
-        hasPreviewData={!!previewData}
         onDanlonConnectionChange={handleDanlonConnectionChange}
       />
 
@@ -187,6 +186,7 @@ function App() {
             onAbsenceChange={updateAbsenceSelection}
             onShowDetails={handleShowDetails}
             onExport={exportData}
+            danlonCompanyId={danlonCompanyId}
           />
         )}
       </div>

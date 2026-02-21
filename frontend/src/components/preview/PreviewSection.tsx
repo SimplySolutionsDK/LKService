@@ -18,6 +18,7 @@ interface PreviewSectionProps {
   onAbsenceChange: (date: string, absenceType: AbsenceType) => void;
   onShowDetails: (index: number) => void;
   onExport: () => void;
+  danlonCompanyId?: string;
 }
 
 export const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -32,6 +33,7 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
   onAbsenceChange,
   onShowDetails,
   onExport,
+  danlonCompanyId,
 }) => {
   return (
     <div className="w-full mt-2 animate-fade-in">
@@ -63,6 +65,8 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
           outputFormat={outputFormat}
           onFormatChange={onFormatChange}
           onExport={onExport}
+          danlonCompanyId={danlonCompanyId}
+          previewSessionId={data.session_id}
         />
       </div>
     </div>

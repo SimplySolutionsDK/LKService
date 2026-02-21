@@ -8,6 +8,11 @@ from contextlib import asynccontextmanager
 
 from app.routers import upload, api_fetch, danlon_oauth, danlon_integration_example, danlon_test
 from app.database import init_db, close_db
+# Import models so SQLAlchemy registers them before init_db creates tables
+import app.models.danlon_tokens  # noqa: F401
+import app.models.danlon_pending_session  # noqa: F401
+import app.models.danlon_pay_code_mapping  # noqa: F401
+import app.models.danlon_employee_mapping  # noqa: F401
 
 # Load environment variables from .env file
 load_dotenv()

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Select } from '../ui/Select';
 import { DanlonConnection } from '../danlon/DanlonConnection';
-import { DanlonSync } from '../danlon/DanlonSync';
+import { DanlonPayCodeMapping } from '../danlon/DanlonPayCodeMapping';
+import { DanlonEmployeeMapping } from '../danlon/DanlonEmployeeMapping';
 import type { EmployeeType } from '../../types';
 
 interface HeaderProps {
   employeeType: EmployeeType;
   onEmployeeTypeChange: (type: EmployeeType) => void;
   danlonCompanyId?: string;
-  hasPreviewData?: boolean;
   onDanlonConnectionChange?: () => void;
 }
 
@@ -19,12 +19,11 @@ const employeeTypeOptions = [
   { value: 'Elev', label: 'Elev (Handels/Kontor)' },
 ];
 
-export const Header: React.FC<HeaderProps> = ({ 
-  employeeType, 
+export const Header: React.FC<HeaderProps> = ({
+  employeeType,
   onEmployeeTypeChange,
   danlonCompanyId,
-  hasPreviewData,
-  onDanlonConnectionChange
+  onDanlonConnectionChange,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'danlon'>('general');
@@ -111,13 +110,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ) : (
                   <div className="space-y-4">
                     <DanlonConnection />
-                    {hasPreviewData && (
-                      <DanlonSync
-                        companyId={danlonCompanyId}
-                        hasData={hasPreviewData}
-                        onSyncComplete={handleDanlonSync}
-                      />
-                    )}
+                    <DanlonPayCodeMapping connected={!!danlonCompanyId} />
+                    <DanlonEmployeeMapping connected={!!danlonCompanyId} />
                   </div>
                 )}
               </div>

@@ -10,31 +10,35 @@ interface SyncResult {
     skipped: number;
     errors: number;
   };
-  skipped_items?: Array<{ reason: string; data: any }>;
+  skipped_items?: Array<{ worker?: string; date?: string; reason: string }>;
   errors?: Array<{ reason: string }>;
+  unmatched_workers?: string[];
 }
 
 interface DanlonSyncProps {
   companyId?: string;
+  sessionId?: string;
   hasData: boolean;
   onSyncComplete?: () => void;
 }
 
-export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncProps) {
+export function DanlonSync({ companyId, sessionId, hasData, onSyncComplete }: DanlonSyncProps) {
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   const handleSync = async () => {
     if (!companyId) {
-      setResult({
-        success: false,
-        message: 'Please connect to Danløn first',
-      });
+      setResult({ success: false, message: 'Please connect to Danløn first' });
       return;
     }
 
-    if (!confirm('Sync current data to Danløn? This will create payparts for all processed time registrations.')) {
+    if (!sessionId) {
+      setResult({ success: false, message: 'No processed data found. Please process your time registrations first.' });
+      return;
+    }
+
+    if (!confirm('Send bearbejdet data til Danløn? Dette opretter løndele for alle behandlede tidsregistreringer.')) {
       return;
     }
 
@@ -42,11 +46,20 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
       setSyncing(true);
       setResult(null);
 
-      const response = await fetch(`/danlon/example/sync-payparts?company_id=${companyId}`, {
+      const response = await fetch(`/danlon/sync/${sessionId}?company_id=${companyId}`, {
         method: 'POST',
       });
 
       const data = await response.json();
+
+      if (!response.ok) {
+        setResult({
+          success: false,
+          message: data.detail || `Server error (${response.status})`,
+        });
+        return;
+      }
+
       setResult(data);
 
       if (data.success && onSyncComplete) {
@@ -55,7 +68,7 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
     } catch (err) {
       setResult({
         success: false,
-        message: 'Failed to sync to Danløn: ' + (err as Error).message,
+        message: 'Fejl ved synkronisering til Danløn: ' + (err as Error).message,
       });
       console.error(err);
     } finally {
@@ -73,10 +86,10 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
         <div>
           <h3 className="text-[1.1rem] font-semibold mb-2 flex items-center gap-2">
             <span>📤</span>
-            Sync to Danløn
+            Send til Danløn
           </h3>
           <p className="text-[0.85rem] text-slate-400">
-            Push processed time registrations to Danløn as payparts
+            Opret løndele i Danløn fra de behandlede tidsregistreringer
           </p>
         </div>
 
@@ -85,9 +98,21 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
             <div className="flex items-start gap-3">
               <span className="text-xl">⚠️</span>
               <div>
-                <p className="font-medium text-yellow-400 mb-1">Not Connected</p>
+                <p className="font-medium text-yellow-400 mb-1">Ikke forbundet</p>
                 <p className="text-sm text-slate-400">
-                  Connect to Danløn first to enable sync
+                  Forbind til Danløn for at aktivere synkronisering
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : !sessionId ? (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <p className="font-medium text-yellow-400 mb-1">Ingen data</p>
+                <p className="text-sm text-slate-400">
+                  Behandl dine tidsregistreringer for at aktivere synkronisering
                 </p>
               </div>
             </div>
@@ -102,12 +127,12 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
               {syncing ? (
                 <>
                   <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Syncing...</span>
+                  <span>Sender...</span>
                 </>
               ) : (
                 <>
                   <span>🚀</span>
-                  <span>Sync to Danløn</span>
+                  <span>Send til Danløn</span>
                 </>
               )}
             </Button>
@@ -123,14 +148,14 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
                         {result.summary && (
                           <div className="grid grid-cols-3 gap-3 text-sm">
                             <div className="bg-bg-card rounded p-2">
-                              <p className="text-slate-400 text-xs mb-1">Created</p>
+                              <p className="text-slate-400 text-xs mb-1">Oprettet</p>
                               <p className="text-lg font-semibold text-green-400">
                                 {result.summary.created}
                               </p>
                             </div>
                             {result.summary.skipped > 0 && (
                               <div className="bg-bg-card rounded p-2">
-                                <p className="text-slate-400 text-xs mb-1">Skipped</p>
+                                <p className="text-slate-400 text-xs mb-1">Sprunget over</p>
                                 <p className="text-lg font-semibold text-yellow-400">
                                   {result.summary.skipped}
                                 </p>
@@ -138,7 +163,7 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
                             )}
                             {result.summary.errors > 0 && (
                               <div className="bg-bg-card rounded p-2">
-                                <p className="text-slate-400 text-xs mb-1">Errors</p>
+                                <p className="text-slate-400 text-xs mb-1">Fejl</p>
                                 <p className="text-lg font-semibold text-red-400">
                                   {result.summary.errors}
                                 </p>
@@ -154,22 +179,38 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">✗</span>
                       <div className="flex-1">
-                        <p className="font-medium text-red-400 mb-1">Sync Failed</p>
+                        <p className="font-medium text-red-400 mb-1">Synkronisering mislykkedes</p>
                         <p className="text-sm text-slate-300">{result.message}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {(result.skipped_items && result.skipped_items.length > 0) || 
-                 (result.errors && result.errors.length > 0) ? (
+                {result.unmatched_workers && result.unmatched_workers.length > 0 && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-xs font-medium text-yellow-400 mb-1">
+                      Medarbejdere uden match i Danløn:
+                    </p>
+                    <ul className="text-xs text-slate-400 list-disc list-inside space-y-0.5">
+                      {result.unmatched_workers.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Kontroller at medarbejdernavne i Danløn stemmer overens med navne i tidsregistreringen.
+                    </p>
+                  </div>
+                )}
+
+                {((result.skipped_items && result.skipped_items.length > 0) ||
+                  (result.errors && result.errors.length > 0)) && (
                   <div>
                     <button
                       type="button"
                       className="text-sm text-accent hover:text-accent-light underline"
                       onClick={() => setShowDetails(!showDetails)}
                     >
-                      {showDetails ? '▼ Hide Details' : '▶ Show Details'}
+                      {showDetails ? '▼ Skjul detaljer' : '▶ Vis detaljer'}
                     </button>
 
                     {showDetails && (
@@ -177,36 +218,38 @@ export function DanlonSync({ companyId, hasData, onSyncComplete }: DanlonSyncPro
                         {result.skipped_items?.map((item, i) => (
                           <div key={i} className="bg-bg-secondary rounded p-3 text-xs">
                             <p className="text-yellow-400 font-medium mb-1">
-                              Skipped: {item.reason}
+                              Sprunget over: {item.reason}
                             </p>
-                            <pre className="text-slate-500 overflow-x-auto">
-                              {JSON.stringify(item.data, null, 2)}
-                            </pre>
+                            {(item.worker || item.date) && (
+                              <p className="text-slate-500">
+                                {item.worker && <span>Medarbejder: {item.worker}</span>}
+                                {item.worker && item.date && ' — '}
+                                {item.date && <span>Dato: {item.date}</span>}
+                              </p>
+                            )}
                           </div>
                         ))}
                         {result.errors?.map((error, i) => (
                           <div key={i} className="bg-bg-secondary rounded p-3 text-xs">
-                            <p className="text-red-400 font-medium">
-                              Error: {error.reason}
-                            </p>
+                            <p className="text-red-400 font-medium">Fejl: {error.reason}</p>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                ) : null}
+                )}
               </div>
             )}
           </>
         )}
 
         <div className="text-xs text-slate-500 bg-bg-secondary rounded-lg p-3">
-          <p className="font-medium mb-1">ℹ️ About Syncing:</p>
+          <p className="font-medium mb-1">ℹ️ Om synkronisering:</p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>Syncs all processed time registrations to Danløn</li>
-            <li>Creates payparts for matched employees</li>
-            <li>Skips entries with missing employee or pay code info</li>
-            <li>Shows detailed results after sync</li>
+            <li>Opretter løndele for normaltimer, overtid og udkald</li>
+            <li>Matcher medarbejdere på fuldt navn mod Danløn</li>
+            <li>Springer poster over uden match eller timer</li>
+            <li>Viser detaljerede resultater efter afsendelse</li>
           </ul>
         </div>
       </div>

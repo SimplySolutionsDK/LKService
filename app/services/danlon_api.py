@@ -109,38 +109,47 @@ class DanlonAPIService:
         return result["data"]["companies"]
     
     async def get_employees(
-        self, 
-        include_deleted: bool = False
+        self,
+        include_deleted: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Get all employees for the company.
-        
+        Get all employees for the company via companiesExt.
+
         Args:
-            include_deleted: Whether to include deleted employees
-            
+            include_deleted: Whether to include inactive employees
+
         Returns:
-            List of employee objects
+            List of employee objects with keys: id, name, active, domainId, email
         """
         query = """
-        query GetEmployees($includeDeleted: Boolean!) {
-            current_company {
-                employees(includeDeleted: $includeDeleted) {
-                    id
-                    first_name
-                    last_name
-                    cpr_number
-                    email
-                    employment_number
+        query GetCompanyEmployees($companyIds: [ID!]!) {
+            companiesExt(input: {companyIds: $companyIds}) {
+                companies {
+                    employees {
+                        employees {
+                            id
+                            active
+                            domainId
+                            name
+                            email
+                        }
+                    }
                 }
             }
         }
         """
-        
+
         result = await self._execute_query(
-            query, 
-            variables={"includeDeleted": include_deleted}
+            query,
+            variables={"companyIds": [self.company_id]},
         )
-        return result["data"]["current_company"]["employees"]
+        companies = result["data"]["companiesExt"]["companies"]
+        if not companies:
+            return []
+        employees: List[Dict[str, Any]] = companies[0]["employees"]["employees"]
+        if not include_deleted:
+            employees = [e for e in employees if e.get("active", True)]
+        return employees
     
     async def get_paypart_meta(self) -> Dict[str, Any]:
         """
@@ -174,128 +183,150 @@ class DanlonAPIService:
         
         result = await self._execute_query(query)
         return result["data"]["current_company"]["meta"]
+
+    async def get_pay_parts_meta(self) -> List[Dict[str, Any]]:
+        """
+        Fetch the payPartsMeta list from Danløn.
+
+        Each item describes a valid pay part code and which fields
+        (units, rate, amount) are allowed for that code.
+
+        Returns:
+            List of dicts with keys: code, description, unitsAllowed,
+            rateAllowed, amountAllowed
+        """
+        query = """
+        query GetPayPartsMeta {
+            payPartsMeta {
+                payPartsMeta {
+                    code
+                    description
+                    unitsAllowed
+                    rateAllowed
+                    amountAllowed
+                }
+            }
+        }
+        """
+
+        result = await self._execute_query(query)
+        return result["data"]["payPartsMeta"]["payPartsMeta"]
     
     async def create_payparts(
-        self, 
+        self,
         payparts: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         Create payparts (time registrations) for employees.
-        
+
         This is the main function to call when workers are ready to import
         their time registrations to Danløn.
-        
+
         Args:
-            payparts: List of paypart objects to create
-            
-        Example paypart object:
+            payparts: List of paypart objects to create.
+
+        Each paypart must have:
             {
-                "employee_id": "123",
-                "date": "2024-02-15",
-                "pay_code_id": "456",
-                "hours": 8.0,
-                "rate": 200.0,
-                "amount": 1600.0,
-                "hour_type_id": "789",  # optional
-                "text": "Regular work",  # optional
-                "reference": "REF-001"  # optional
+                "employeeId": "<danlon employee ID>",
+                "code":       "T1",          # pay part code
+                "units":      8.0,           # optional - hours/units
+                "rate":       200.0,         # optional - rate per unit
+                "amount":     1600.0         # optional - total amount
             }
-            
+            Include only the fields allowed by the pay code's unitsAllowed /
+            rateAllowed / amountAllowed flags.
+
         Returns:
-            Result object with created payparts
-            
+            {"createdPayParts": [...]}
+
         Raises:
-            Exception if creation fails
+            Exception if the mutation returns GraphQL errors or HTTP errors.
         """
-        mutation = """
-        mutation CreatePayParts($input: CreatePayPartsInput!) {
-            createPayParts(input: $input) {
-                payparts {
+        # Build pay-parts list literal for inline GraphQL (avoids variable
+        # type-name issues reported with some Danløn environments).
+        # Danløn's schema types units, rate, and amount as Int.
+        # Hours are stored as centesimal units (1 hour = 100), preserving
+        # fractional precision without decimals: 7.5 h → 750.
+        # Monetary amounts are rounded to nearest whole DKK.
+        def _paypart_to_gql(pp: Dict[str, Any]) -> str:
+            fields = [f'employeeId: "{pp["employeeId"]}"', f'code: "{pp["code"]}"']
+            if pp.get("units") is not None:
+                centesimal = int(round(float(pp["units"]) * 100))
+                fields.append(f"units: {centesimal}")
+            if pp.get("rate") is not None:
+                fields.append(f"rate: {int(round(float(pp['rate'])))}")
+            if pp.get("amount") is not None:
+                fields.append(f"amount: {int(round(float(pp['amount'])))}")
+            return "{" + ", ".join(fields) + "}"
+
+        pay_parts_literal = "[" + ", ".join(_paypart_to_gql(pp) for pp in payparts) + "]"
+
+        mutation = f"""
+        mutation CreatePayParts {{
+            createPayParts(input: {{
+                companyId: "{self.company_id}",
+                payParts: {pay_parts_literal}
+            }}) {{
+                createdPayParts {{
                     id
-                    employee_id
-                    date
-                    pay_code_id
-                    hours
+                    code
+                    units
                     rate
                     amount
-                }
-                errors {
-                    message
-                    field
-                }
-            }
-        }
+                    employee {{
+                        id
+                        name
+                    }}
+                }}
+            }}
+        }}
         """
-        
-        variables = {
-            "input": {
-                "payparts": payparts
-            }
-        }
-        
+
         logger.info(f"Creating {len(payparts)} payparts for company {self.company_id}")
-        
-        result = await self._execute_query(mutation, variables=variables)
-        
-        # Check for errors in the response
-        if "errors" in result["data"]["createPayParts"]:
-            errors = result["data"]["createPayParts"]["errors"]
-            if errors:
-                error_messages = [f"{e.get('field', 'unknown')}: {e.get('message', 'unknown error')}" for e in errors]
-                raise Exception(f"Failed to create payparts: {', '.join(error_messages)}")
-        
-        created_count = len(result["data"]["createPayParts"]["payparts"])
-        logger.info(f"Successfully created {created_count} payparts")
-        
-        return result["data"]["createPayParts"]
-    
+
+        result = await self._execute_query(mutation)
+
+        if result.get("errors"):
+            error_messages = [e.get("message", "unknown error") for e in result["errors"]]
+            raise Exception(f"Failed to create payparts: {'; '.join(error_messages)}")
+
+        created = result["data"]["createPayParts"]["createdPayParts"]
+        logger.info(f"Successfully created {len(created)} payparts")
+
+        return {"createdPayParts": created}
+
     async def create_paypart(
         self,
         employee_id: str,
-        date: str,
-        pay_code_id: str,
-        hours: float,
-        rate: float,
-        amount: float,
-        hour_type_id: Optional[str] = None,
-        text: Optional[str] = None,
-        reference: Optional[str] = None
+        code: str,
+        units: Optional[float] = None,
+        rate: Optional[float] = None,
+        amount: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Create a single paypart (convenience method).
-        
+
         Args:
             employee_id: Danløn employee ID
-            date: Date in YYYY-MM-DD format
-            pay_code_id: Pay code ID
-            hours: Number of hours
-            rate: Hourly rate
-            amount: Total amount (hours * rate)
-            hour_type_id: Optional hour type ID
-            text: Optional description text
-            reference: Optional reference number
-            
+            code:        Pay part code (e.g. "T1")
+            units:       Number of units / hours (if allowed by the code)
+            rate:        Rate per unit (if allowed by the code)
+            amount:      Total amount (if allowed by the code)
+
         Returns:
-            Created paypart object
+            Created paypart object or None
         """
-        paypart = {
-            "employee_id": employee_id,
-            "date": date,
-            "pay_code_id": pay_code_id,
-            "hours": hours,
-            "rate": rate,
-            "amount": amount
-        }
-        
-        if hour_type_id:
-            paypart["hour_type_id"] = hour_type_id
-        if text:
-            paypart["text"] = text
-        if reference:
-            paypart["reference"] = reference
-        
+        paypart: Dict[str, Any] = {"employeeId": employee_id, "code": code}
+        if units is not None:
+            paypart["units"] = units
+        if rate is not None:
+            paypart["rate"] = rate
+        if amount is not None:
+            paypart["amount"] = amount
+
         result = await self.create_payparts([paypart])
-        return result["payparts"][0] if result["payparts"] else None
+        created = result.get("createdPayParts", [])
+        return created[0] if created else None
 
 
 def get_danlon_api_service(user_id: str, company_id: str) -> DanlonAPIService:

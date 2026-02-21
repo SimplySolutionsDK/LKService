@@ -60,6 +60,25 @@ async def get_db():
             await session.close()
 
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_db_session():
+    """
+    Async context manager for getting database sessions outside of FastAPI dependencies.
+    Use with: async with get_db_session() as session:
+    """
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 async def init_db():
     """Initialize database tables."""
     async with engine.begin() as conn:

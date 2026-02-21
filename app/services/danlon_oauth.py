@@ -4,6 +4,7 @@ Implements the complete OAuth2 authorization code flow with PKCE.
 """
 import os
 import base64
+import secrets
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_maker
 from app.models.danlon_tokens import DanlonToken
+from app.models.danlon_pending_session import DanlonPendingSession
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ class DanlonOAuthService:
         
         # Callback URLs - should be set via environment or defaults to localhost
         self.app_base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+        self.frontend_base_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
         self.redirect_uri = f"{self.app_base_url}/danlon/callback"
         self.success_uri = f"{self.app_base_url}/danlon/success"
     
@@ -409,6 +412,36 @@ class DanlonOAuthService:
                 logger.error(f"Failed to store tokens: {e}")
                 raise
     
+    async def get_all_tokens_for_user(self, user_id: str) -> list[Dict[str, Any]]:
+        """
+        Retrieve all token records for a user from the database.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            List of token data dicts (may be empty)
+        """
+        async with async_session_maker() as session:
+            try:
+                stmt = select(DanlonToken).where(DanlonToken.user_id == user_id)
+                result = await session.execute(stmt)
+                tokens = result.scalars().all()
+                return [
+                    {
+                        "access_token": t.access_token,
+                        "refresh_token": t.refresh_token,
+                        "company_id": t.company_id,
+                        "company_name": t.company_name,
+                        "expires_at": t.expires_at,
+                        "created_at": t.created_at,
+                    }
+                    for t in tokens
+                ]
+            except Exception as e:
+                logger.error(f"Failed to get tokens for user: {e}")
+                return []
+
     async def get_tokens(self, user_id: str, company_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve tokens for a user/company from the database.
@@ -508,6 +541,86 @@ class DanlonOAuthService:
         except Exception as e:
             logger.error(f"Failed to refresh token: {e}")
             return None
+
+
+    async def create_pending_session(
+        self,
+        user_id: str,
+        select_company_url: str,
+        temp_access_token: str,
+        temp_refresh_token: str = "",
+        ttl_minutes: int = 15,
+    ) -> str:
+        """
+        Persist a short-lived pending session after step 4 of the OAuth flow.
+
+        Returns the generated session_id so the caller can pass it to the frontend.
+        """
+        session_id = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=ttl_minutes)
+
+        async with async_session_maker() as session:
+            try:
+                # Remove any stale pending sessions for this user first
+                await session.execute(
+                    delete(DanlonPendingSession).where(DanlonPendingSession.user_id == user_id)
+                )
+                record = DanlonPendingSession(
+                    session_id=session_id,
+                    user_id=user_id,
+                    select_company_url=select_company_url,
+                    temp_access_token=temp_access_token,
+                    temp_refresh_token=temp_refresh_token,
+                    expires_at=expires_at,
+                )
+                session.add(record)
+                await session.commit()
+                logger.info(f"Created pending session {session_id} for user {user_id}")
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to create pending session: {e}")
+                raise
+        return session_id
+
+    async def get_pending_session(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return the latest (non-expired) pending session for a user, or None."""
+        async with async_session_maker() as session:
+            try:
+                stmt = (
+                    select(DanlonPendingSession)
+                    .where(
+                        DanlonPendingSession.user_id == user_id,
+                        DanlonPendingSession.expires_at > datetime.utcnow(),
+                    )
+                    .order_by(DanlonPendingSession.created_at.desc())
+                    .limit(1)
+                )
+                result = await session.execute(stmt)
+                record = result.scalar_one_or_none()
+                if record:
+                    return {
+                        "session_id": record.session_id,
+                        "select_company_url": record.select_company_url,
+                        "temp_access_token": record.temp_access_token,
+                        "temp_refresh_token": record.temp_refresh_token,
+                        "expires_at": record.expires_at,
+                    }
+                return None
+            except Exception as e:
+                logger.error(f"Failed to get pending session: {e}")
+                return None
+
+    async def delete_pending_session(self, user_id: str) -> None:
+        """Remove all pending sessions for a user (after successful completion)."""
+        async with async_session_maker() as session:
+            try:
+                await session.execute(
+                    delete(DanlonPendingSession).where(DanlonPendingSession.user_id == user_id)
+                )
+                await session.commit()
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to delete pending session: {e}")
 
 
 # Singleton instance

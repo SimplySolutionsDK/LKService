@@ -1,0 +1,64 @@
+meta {
+  name: 11. Sync Session to Danløn
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{app_url}}/danlon/sync/{{session_id}}
+  body: none
+  auth: none
+}
+
+params:query {
+  company_id: {{company_id}}
+  user_id: demo_user
+}
+
+script:post-response {
+  const response = res.getBody();
+
+  if (response && res.status === 200) {
+    if (response.success) {
+      console.log(`✓ ${response.message}`);
+      console.log(`  Created:  ${response.summary.created}`);
+      console.log(`  Skipped:  ${response.summary.skipped}`);
+      console.log(`  Errors:   ${response.summary.errors}`);
+
+      if (response.unmatched_workers && response.unmatched_workers.length > 0) {
+        console.warn("⚠ Unmatched workers:", response.unmatched_workers.join(", "));
+      }
+    } else {
+      console.error("✗ Sync failed:", response.message);
+      if (response.skipped_items) {
+        response.skipped_items.forEach(item => {
+          console.warn(`  Skipped [${item.worker || "?"}/${item.date || "?"}]: ${item.reason}`);
+        });
+      }
+    }
+  } else {
+    console.error("✗ Request failed, status:", res.status);
+    console.error(response);
+  }
+}
+
+docs {
+  # Sync Processed Session to Danløn
+
+  Submits the processed preview data (from POST /api/preview) to Danløn
+  as payparts using the saved pay-code mapping.
+
+  **Prerequisites:**
+  1. A Danløn connection must be established (run Steps 1-9)
+  2. A preview session must exist — upload/fetch data via the LKService UI first
+     and copy the `session_id` from the response into the {{session_id}} variable
+  3. Optionally configure the pay-code mapping via the UI (Settings → Danløn)
+
+  **What happens:**
+  - Normal hours    → normal pay code  (default T1)
+  - Overtime hours  → overtime pay code (default T2)
+  - Call-out amount → callout pay code  (default T3)
+
+  Each day row becomes 1–3 payparts depending on what hours are present.
+  Workers are matched by full name (case-insensitive) against Danløn employees.
+}
