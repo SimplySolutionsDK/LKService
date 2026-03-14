@@ -6,6 +6,7 @@ import { UploadCard } from './components/upload/UploadCard';
 import { ApiFetchCard } from './components/api-fetch/ApiFetchCard';
 import { PreviewSection } from './components/preview/PreviewSection';
 import { EntriesModal } from './components/modals/EntriesModal';
+import { HalfSickDayModal } from './components/modals/HalfSickDayModal';
 import { Button } from './components/ui/Button';
 import { Status } from './components/ui/Status';
 import { useFileUpload } from './hooks/useFileUpload';
@@ -21,6 +22,7 @@ function App() {
   const [employeeType, setEmployeeType] = useState<EmployeeType>('Svend');
   const [selectedRecord, setSelectedRecord] = useState<DailyRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHalfSickModalOpen, setIsHalfSickModalOpen] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>('api');
   const [danlonCompanyId, setDanlonCompanyId] = useState<string | undefined>();
 
@@ -30,8 +32,10 @@ function App() {
     outputFormat,
     callOutSelections,
     absenceSelections,
+    overtimeOverrides,
     status,
     isLoading,
+    isHalfSickLoading,
     setActiveTab,
     setOutputFormat,
     loadPreview,
@@ -39,6 +43,8 @@ function App() {
     exportData,
     updateCallOutSelection,
     updateAbsenceSelection,
+    applyHalfSickDay,
+    updateOvertimeOverride,
     clearPreview,
   } = usePreview();
 
@@ -58,7 +64,6 @@ function App() {
   };
 
   const handleApiFetchedData = async (params: ApiFetchParams) => {
-    // Clear any uploaded CSV files when using API fetch
     if (files.length > 0) {
       files.forEach((_, index) => removeFile(index));
     }
@@ -77,8 +82,12 @@ function App() {
     setSelectedRecord(null);
   };
 
+  const handleHalfSickDayApply = async (date: string) => {
+    await applyHalfSickDay(date);
+    setIsHalfSickModalOpen(false);
+  };
+
   const handleDanlonConnectionChange = async () => {
-    // Refresh Danløn connection status
     try {
       const response = await fetch('/danlon/status');
       const data = await response.json();
@@ -93,7 +102,6 @@ function App() {
     }
   };
 
-  // Check Danløn connection status on mount
   useEffect(() => {
     handleDanlonConnectionChange();
   }, []);
@@ -146,7 +154,7 @@ function App() {
                   onFilesSelected={handleFilesSelected}
                   onFileRemove={handleFileRemove}
                 />
-                
+
                 <div className="flex flex-col gap-4">
                   <Button
                     variant="primary"
@@ -164,10 +172,9 @@ function App() {
 
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-[10px] py-3.5 px-4 text-[0.8rem] text-slate-400 leading-relaxed mt-6">
             <strong className="text-accent-light">Overtidsberegning (DBR/Industriens Overenskomst 2026):</strong><br />
-            • Normtid: 37 timer ugentligt<br />
-            • Hverdage: Timer-tærskel (1./2., 3./4., 5.+ time) + tid-på-dagen (06-18 / 18-06)<br />
-            • Lørdag: Anvendes fridag-satser (dag: 76,80 kr, nat: 143,70 kr)<br />
-            • Søndag: Før kl. 12 (95,75 kr), efter kl. 12 (143,70 kr)<br />
+            • Normtid: 74 timer per 14-dages periode (ISO uge-par: uge 1+2, 3+4, 5+6 osv.)<br />
+            • Hverdage over 74 timer: OT1 (1.-2. time), OT2 (3.-4. time), OT3 (5.+ time)<br />
+            • Weekend: Alle lørdag- og søndagstimer tæller som OT Weekend (flat sats 143,70 kr) og indgår IKKE i de 74 normtimer<br />
             • Call-out: 750 kr ved arbejde før 07:00 eller fra 15:30<br />
             <small>Satser gældende fra 1. marts 2026</small>
           </div>
@@ -180,11 +187,14 @@ function App() {
             outputFormat={outputFormat}
             callOutSelections={callOutSelections}
             absenceSelections={absenceSelections}
+            overtimeOverrides={overtimeOverrides}
             onTabChange={setActiveTab}
             onFormatChange={setOutputFormat}
             onCallOutChange={updateCallOutSelection}
             onAbsenceChange={updateAbsenceSelection}
+            onOvertimeOverride={updateOvertimeOverride}
             onShowDetails={handleShowDetails}
+            onHalfSickDayOpen={() => setIsHalfSickModalOpen(true)}
             onExport={exportData}
             danlonCompanyId={danlonCompanyId}
           />
@@ -195,6 +205,14 @@ function App() {
         isOpen={isModalOpen}
         record={selectedRecord}
         onClose={handleCloseModal}
+      />
+
+      <HalfSickDayModal
+        isOpen={isHalfSickModalOpen}
+        dailyRecords={previewData?.daily ?? []}
+        onClose={() => setIsHalfSickModalOpen(false)}
+        onApply={handleHalfSickDayApply}
+        isLoading={isHalfSickLoading}
       />
 
       <Footer />

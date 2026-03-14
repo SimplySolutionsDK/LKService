@@ -22,13 +22,13 @@ export const PreviewTabs: React.FC<PreviewTabsProps> = ({ activeTab, onTabChange
         Daglig
       </button>
       <button
-        className={clsx(baseTab, activeTab === 'weekly'
+        className={clsx(baseTab, activeTab === 'period'
           ? 'bg-accent border border-accent text-white'
           : 'bg-bg-secondary border border-border text-slate-400 hover:border-accent hover:text-slate-100'
         )}
-        onClick={() => onTabChange('weekly')}
+        onClick={() => onTabChange('period')}
       >
-        Ugentlig
+        14-Dages Periode
       </button>
     </div>
   );

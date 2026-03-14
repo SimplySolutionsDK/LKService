@@ -1,133 +1,110 @@
 from collections import defaultdict
 from datetime import date as date_type
+from math import floor
 from typing import Dict, List, Tuple
 
-from app.models.schemas import DailyRecord, DayType, EmployeeType, WeeklySummary, DailyOutput, OvertimeBreakdown, AbsentType
+from app.models.schemas import DailyRecord, DayType, EmployeeType, PeriodSummary, DailyOutput, OvertimeBreakdown, AbsentType
 from app.services.call_out_detector import detect_call_out_eligibility
 
 
-# Weekly norm hours
-WEEKLY_NORM_HOURS = 37.0
+# 14-day period norm hours (2 × 37h)
+PERIOD_NORM_HOURS = 74.0
 
 # Standard daily hours (used for crediting vacation/sick/holiday)
 # Per Danish collective agreement:
 # - Monday-Thursday: 7.5 hours each
 # - Friday: 7.0 hours
-# Total: (4 * 7.5) + 7.0 = 37.0 hours
-STANDARD_DAILY_HOURS = WEEKLY_NORM_HOURS / 5.0  # 7.4 hours (legacy fallback)
-
-# Overtime thresholds
-OVERTIME_1_THRESHOLD = 3.0  # First 3 hours of overtime (legacy)
+# Total: (4 × 7.5) + 7.0 = 37.0 hours per week / 74.0 per 14-day period
+STANDARD_DAILY_HOURS = 37.0 / 5.0  # 7.4 hours (legacy fallback)
 
 
 def get_credited_hours_for_day(weekday: int) -> float:
     """
     Get credited hours for a day based on the weekday.
-    
+
     Per Danish collective agreement:
     - Monday-Thursday (0-3): 7.5 hours
     - Friday (4): 7.0 hours
-    - Weekend (5-6): 0.0 hours (weekends are not normally credited)
-    
+    - Weekend (5-6): 0.0 hours
+
     Args:
         weekday: Day of week (0=Monday, 6=Sunday)
-        
+
     Returns:
         Credited hours for the day
     """
-    if 0 <= weekday <= 3:  # Monday-Thursday
+    if 0 <= weekday <= 3:   # Monday-Thursday
         return 7.5
-    elif weekday == 4:  # Friday
+    elif weekday == 4:       # Friday
         return 7.0
-    else:  # Weekend
+    else:                    # Weekend
         return 0.0
 
-# DBR 2026 Overtime Rates (Dansk Bilbrancheråd Collective Agreement)
-# Rates effective May 1, 2025 - February 28, 2026
+
+# -----------------------------------------------------------------------
+# DBR Overtime Rates
+# Weekend rate = flat OT3-level rate (same as weekday_hour_5_plus).
+# Saturday and Sunday are no longer split into sub-categories.
+# -----------------------------------------------------------------------
+
 RATES_2025 = {
     'weekday_hour_1_2': 46.70,
     'weekday_hour_3_4': 74.55,
     'weekday_hour_5_plus': 139.50,
-    'weekday_scheduled_day': 46.70,  # 06:00-18:00 with notice
+    'weekday_scheduled_day': 46.70,    # 06:00-18:00 with notice
     'weekday_scheduled_night': 139.50,  # 18:00-06:00 with notice
-    'dayoff_day': 74.55,  # 06:00-18:00
-    'dayoff_night': 139.50,  # 18:00-06:00
-    'saturday_day': 74.55,  # 06:00-18:00
-    'saturday_night': 139.50,  # 18:00-06:00
-    'sunday_before_noon': 92.95,  # Before 12:00
-    'sunday_after_noon': 139.50,  # After 12:00
+    'dayoff_day': 74.55,               # 06:00-18:00
+    'dayoff_night': 139.50,            # 18:00-06:00
+    'weekend': 139.50,                  # Flat OT3 rate for all Sat/Sun hours
     'insufficient_notice': 119.10,
-    'lunch_break': 33.05
+    'lunch_break': 33.05,
 }
 
-# Rates effective March 1, 2026 - February 28, 2027
 RATES_2026 = {
     'weekday_hour_1_2': 48.10,
     'weekday_hour_3_4': 76.80,
     'weekday_hour_5_plus': 143.70,
-    'weekday_scheduled_day': 48.10,  # 06:00-18:00 with notice
-    'weekday_scheduled_night': 143.70,  # 18:00-06:00 with notice
-    'dayoff_day': 76.80,  # 06:00-18:00
-    'dayoff_night': 143.70,  # 18:00-06:00
-    'saturday_day': 76.80,  # 06:00-18:00
-    'saturday_night': 143.70,  # 18:00-06:00
-    'sunday_before_noon': 95.75,  # Before 12:00
-    'sunday_after_noon': 143.70,  # After 12:00
+    'weekday_scheduled_day': 48.10,
+    'weekday_scheduled_night': 143.70,
+    'dayoff_day': 76.80,
+    'dayoff_night': 143.70,
+    'weekend': 143.70,
     'insufficient_notice': 122.70,
-    'lunch_break': 34.05
+    'lunch_break': 34.05,
 }
 
-# Rates effective March 1, 2027 onwards
 RATES_2027 = {
     'weekday_hour_1_2': 49.55,
     'weekday_hour_3_4': 79.10,
     'weekday_hour_5_plus': 148.00,
-    'weekday_scheduled_day': 49.55,  # 06:00-18:00 with notice
-    'weekday_scheduled_night': 148.00,  # 18:00-06:00 with notice
-    'dayoff_day': 79.10,  # 06:00-18:00
-    'dayoff_night': 148.00,  # 18:00-06:00
-    'saturday_day': 79.10,  # 06:00-18:00
-    'saturday_night': 148.00,  # 18:00-06:00
-    'sunday_before_noon': 98.60,  # Before 12:00
-    'sunday_after_noon': 148.00,  # After 12:00
+    'weekday_scheduled_day': 49.55,
+    'weekday_scheduled_night': 148.00,
+    'dayoff_day': 79.10,
+    'dayoff_night': 148.00,
+    'weekend': 148.00,
     'insufficient_notice': 126.35,
-    'lunch_break': 35.10
+    'lunch_break': 35.10,
 }
 
 
 def apply_credited_hours(records: list[DailyRecord]) -> list[DailyRecord]:
     """
     Apply credited hours for vacation, sick days, and public holidays.
-    
+
     Days with absent_type set to VACATION, SICK, or PUBLIC_HOLIDAY will be
-    credited with day-specific hours (7.5h Mon-Thu, 7.0h Fri) toward the weekly norm.
-    
-    Args:
-        records: List of DailyRecord objects
-        
-    Returns:
-        Updated list with credited hours applied
+    credited with day-specific hours (7.5h Mon-Thu, 7.0h Fri) toward the
+    period norm.
     """
     for record in records:
-        if record.absent_type in [AbsentType.VACATION, AbsentType.SICK, AbsentType.PUBLIC_HOLIDAY]:
-            # Credit day-specific hours based on weekday
+        if record.absent_type in [AbsentType.VACATION, AbsentType.SICK, AbsentType.PUBLIC_HOLIDAY, AbsentType.KURSUS]:
             weekday = record.date.weekday()
             record.credited_hours = get_credited_hours_for_day(weekday)
-            record.is_day_off = True  # Mark as day off for rate purposes if they work
-    
+            record.is_day_off = True
     return records
 
 
 def get_overtime_rates(calculation_date: date_type) -> Dict[str, float]:
-    """
-    Get applicable overtime rates based on the calculation date.
-    
-    Args:
-        calculation_date: Date for which to calculate overtime rates
-        
-    Returns:
-        Dictionary of overtime rates applicable for the given date
-    """
+    """Return applicable overtime rates for a given date."""
     if calculation_date >= date_type(2027, 3, 1):
         return RATES_2027
     elif calculation_date >= date_type(2026, 3, 1):
@@ -136,194 +113,71 @@ def get_overtime_rates(calculation_date: date_type) -> Dict[str, float]:
         return RATES_2025
 
 
-def categorize_entry_overtime(
-    entry_start: 'time',
-    entry_end: 'time',
-    entry_hours: float,
-    day_type: DayType,
-    is_day_off: bool,
-    weekly_ot_hours_used: float
-) -> OvertimeBreakdown:
-    """
-    Categorize overtime hours for a single time entry based on DBR 2026 rules.
-    
-    Args:
-        entry_start: Start time of the entry
-        entry_end: End time of the entry
-        entry_hours: Total hours in the entry
-        day_type: Type of day (Weekday, Saturday, Sunday)
-        is_day_off: Whether this is a scheduled day off
-        weekly_ot_hours_used: Cumulative overtime hours already used this week
-        
-    Returns:
-        OvertimeBreakdown with categorized hours
-    """
-    from app.services.time_calculator import (
-        calculate_overtime_day_night_split,
-        calculate_sunday_noon_split
-    )
-    from datetime import time as time_type
-    
-    breakdown = OvertimeBreakdown()
-    
-    # Sunday has special handling
-    if day_type == DayType.SUNDAY:
-        before_noon, after_noon = calculate_sunday_noon_split(entry_start, entry_end)
-        breakdown.ot_sunday_before_noon = before_noon
-        breakdown.ot_sunday_after_noon = after_noon
-        return breakdown
-    
-    # Saturday uses day-off rates
-    if day_type == DayType.SATURDAY:
-        day_hours, night_hours = calculate_overtime_day_night_split(entry_start, entry_end)
-        breakdown.ot_saturday_day = day_hours
-        breakdown.ot_saturday_night = night_hours
-        return breakdown
-    
-    # Weekday handling - split by day/night
-    day_hours, night_hours = calculate_overtime_day_night_split(entry_start, entry_end)
-    
-    if is_day_off:
-        # Day off uses different rates
-        breakdown.ot_dayoff_day = day_hours
-        breakdown.ot_dayoff_night = night_hours
-    else:
-        # Regular weekday - use scheduled rates
-        breakdown.ot_weekday_scheduled_day = day_hours
-        breakdown.ot_weekday_scheduled_night = night_hours
-    
-    return breakdown
+# -----------------------------------------------------------------------
+# Period grouping
+# -----------------------------------------------------------------------
 
+def get_period_number(iso_week: int) -> int:
+    """
+    Map an ISO week number to a 0-based 14-day period index.
+
+    Pairing: weeks 1+2 → period 0, weeks 3+4 → period 1, etc.
+    Formula: floor((week - 1) / 2)
+    """
+    return floor((iso_week - 1) / 2)
+
+
+def group_records_by_period(
+    records: list[DailyRecord],
+) -> Dict[Tuple[str, int, int], list[DailyRecord]]:
+    """
+    Group daily records by (worker_name, year, period_number).
+
+    Returns dictionary sorted by key for deterministic processing.
+    """
+    grouped: Dict[Tuple[str, int, int], list[DailyRecord]] = defaultdict(list)
+
+    for record in records:
+        year = record.date.year
+        period = get_period_number(record.week_number)
+        key = (record.worker_name, year, period)
+        grouped[key].append(record)
+
+    for key in grouped:
+        grouped[key].sort(key=lambda r: r.date)
+
+    return grouped
+
+
+# -----------------------------------------------------------------------
+# Overtime breakdown helpers
+# -----------------------------------------------------------------------
 
 def apply_hourly_thresholds(
     total_overtime_hours: float,
-    weekly_ot_hours_used: float
 ) -> Tuple[float, float, float]:
     """
-    Apply hourly cumulative thresholds to overtime hours.
-    
-    Args:
-        total_overtime_hours: Total overtime hours to categorize
-        weekly_ot_hours_used: Cumulative overtime hours already used this week
-        
+    Distribute overtime hours across the three tier thresholds for a period.
+
+    Tiers (per 14-day period):
+      OT1: first 2 hours
+      OT2: hours 3-4
+      OT3: hours 5+
+
     Returns:
-        Tuple of (hours_in_1_2, hours_in_3_4, hours_in_5_plus)
+        (hours_ot1, hours_ot2, hours_ot3)
     """
-    hours_1_2 = 0.0
-    hours_3_4 = 0.0
-    hours_5_plus = 0.0
-    
     remaining = total_overtime_hours
-    current_ot_count = weekly_ot_hours_used
-    
-    # Fill 1st and 2nd hour threshold (0-2 hours)
-    if current_ot_count < 2.0 and remaining > 0:
-        available = 2.0 - current_ot_count
-        allocated = min(remaining, available)
-        hours_1_2 = allocated
-        remaining -= allocated
-        current_ot_count += allocated
-    
-    # Fill 3rd and 4th hour threshold (2-4 hours)
-    if current_ot_count < 4.0 and remaining > 0:
-        available = 4.0 - current_ot_count
-        allocated = min(remaining, available)
-        hours_3_4 = allocated
-        remaining -= allocated
-        current_ot_count += allocated
-    
-    # Everything else goes to 5+ threshold
-    if remaining > 0:
-        hours_5_plus = remaining
-    
+
+    hours_1_2 = min(remaining, 2.0)
+    remaining = max(0.0, remaining - hours_1_2)
+
+    hours_3_4 = min(remaining, 2.0)
+    remaining = max(0.0, remaining - hours_3_4)
+
+    hours_5_plus = remaining
+
     return hours_1_2, hours_3_4, hours_5_plus
-
-
-def categorize_day_overtime(
-    record: DailyRecord
-) -> Tuple[OvertimeBreakdown, float, float]:
-    """
-    Categorize all overtime for a single day's work.
-    
-    Daily overtime calculation: Each day has its own norm threshold
-    (7.5h Mon-Thu, 7.0h Fri, 0h weekends), and hourly overtime tiers
-    (1st/2nd, 3rd/4th, 5th+) reset each day.
-    
-    Args:
-        record: DailyRecord with time entries
-        
-    Returns:
-        Tuple of (OvertimeBreakdown, norm_hours_this_day, ot_hours_this_day)
-    """
-    day_breakdown = OvertimeBreakdown()
-    
-    # Include both actual work hours and credited hours (vacation/sick/holiday)
-    day_total = record.total_hours + record.credited_hours
-    
-    # Calculate normal hours for this day based on daily norm
-    daily_norm = get_credited_hours_for_day(record.date.weekday())
-    norm_hours = min(day_total, daily_norm)
-    ot_hours = max(0, day_total - norm_hours)
-    
-    # If no overtime, return early
-    if ot_hours == 0:
-        return day_breakdown, norm_hours, 0.0
-    
-    # If this is a credited day with no actual work, categorize overtime using hourly thresholds
-    if record.total_hours == 0 and record.credited_hours > 0:
-        # Apply hourly thresholds (reset daily, so start from 0.0)
-        ot_1_2, ot_3_4, ot_5_plus = apply_hourly_thresholds(ot_hours, 0.0)
-        day_breakdown.ot_weekday_hour_1_2 = ot_1_2
-        day_breakdown.ot_weekday_hour_3_4 = ot_3_4
-        day_breakdown.ot_weekday_hour_5_plus = ot_5_plus
-        return day_breakdown, norm_hours, ot_hours
-    
-    # For weekdays that are not day-off, apply hourly thresholds
-    # AND categorize by time of day
-    if record.day_type == DayType.WEEKDAY and not record.is_day_off:
-        # Apply hourly thresholds (reset daily, so start from 0.0)
-        ot_1_2, ot_3_4, ot_5_plus = apply_hourly_thresholds(ot_hours, 0.0)
-        day_breakdown.ot_weekday_hour_1_2 = ot_1_2
-        day_breakdown.ot_weekday_hour_3_4 = ot_3_4
-        day_breakdown.ot_weekday_hour_5_plus = ot_5_plus
-        
-        # Also categorize by time of day for each overtime entry
-        # We need to split entries to get day/night breakdown
-        for entry in record.entries:
-            entry_breakdown = categorize_entry_overtime(
-                entry.start_time,
-                entry.end_time,
-                entry.total_hours,
-                record.day_type,
-                record.is_day_off,
-                0.0  # No longer cumulative across week
-            )
-            # Add to day breakdown (time-of-day categorization)
-            day_breakdown.ot_weekday_scheduled_day += entry_breakdown.ot_weekday_scheduled_day
-            day_breakdown.ot_weekday_scheduled_night += entry_breakdown.ot_weekday_scheduled_night
-    else:
-        # For Saturday, Sunday, or day-off, categorize each entry
-        for entry in record.entries:
-            entry_breakdown = categorize_entry_overtime(
-                entry.start_time,
-                entry.end_time,
-                entry.total_hours,
-                record.day_type,
-                record.is_day_off,
-                0.0  # No longer cumulative across week
-            )
-            
-            # Accumulate into day breakdown
-            day_breakdown.ot_weekday_scheduled_day += entry_breakdown.ot_weekday_scheduled_day
-            day_breakdown.ot_weekday_scheduled_night += entry_breakdown.ot_weekday_scheduled_night
-            day_breakdown.ot_dayoff_day += entry_breakdown.ot_dayoff_day
-            day_breakdown.ot_dayoff_night += entry_breakdown.ot_dayoff_night
-            day_breakdown.ot_saturday_day += entry_breakdown.ot_saturday_day
-            day_breakdown.ot_saturday_night += entry_breakdown.ot_saturday_night
-            day_breakdown.ot_sunday_before_noon += entry_breakdown.ot_sunday_before_noon
-            day_breakdown.ot_sunday_after_noon += entry_breakdown.ot_sunday_after_noon
-    
-    return day_breakdown, norm_hours, ot_hours
 
 
 def merge_overtime_breakdowns(a: OvertimeBreakdown, b: OvertimeBreakdown) -> OvertimeBreakdown:
@@ -336,117 +190,141 @@ def merge_overtime_breakdowns(a: OvertimeBreakdown, b: OvertimeBreakdown) -> Ove
         ot_weekday_scheduled_night=a.ot_weekday_scheduled_night + b.ot_weekday_scheduled_night,
         ot_dayoff_day=a.ot_dayoff_day + b.ot_dayoff_day,
         ot_dayoff_night=a.ot_dayoff_night + b.ot_dayoff_night,
-        ot_saturday_day=a.ot_saturday_day + b.ot_saturday_day,
-        ot_saturday_night=a.ot_saturday_night + b.ot_saturday_night,
-        ot_sunday_before_noon=a.ot_sunday_before_noon + b.ot_sunday_before_noon,
-        ot_sunday_after_noon=a.ot_sunday_after_noon + b.ot_sunday_after_noon
+        ot_weekend=a.ot_weekend + b.ot_weekend,
     )
 
 
-def calculate_legacy_overtime_values(breakdown: OvertimeBreakdown) -> Tuple[float, float, float]:
+def calculate_ot_values_from_breakdown(
+    breakdown: OvertimeBreakdown,
+) -> Tuple[float, float, float]:
     """
-    Calculate legacy overtime_1/2/3 values from new breakdown for backward compatibility.
-    
-    Maps new categories to old 3-tier system:
-    - overtime_1: 1st/2nd hour threshold
-    - overtime_2: 3rd/4th hour threshold
-    - overtime_3: 5th+ hour threshold + all weekend/special rates
-    
-    Args:
-        breakdown: OvertimeBreakdown with detailed categorization
-        
-    Returns:
-        Tuple of (overtime_1, overtime_2, overtime_3)
+    Extract (ot1, ot2, ot3) from a breakdown.
+
+    ot1  = weekday tier 1-2 hours
+    ot2  = weekday tier 3-4 hours
+    ot3  = weekday tier 5+ hours + weekend + day-off hours
     """
     ot1 = breakdown.ot_weekday_hour_1_2
     ot2 = breakdown.ot_weekday_hour_3_4
-    ot3 = (breakdown.ot_weekday_hour_5_plus +
-           breakdown.ot_saturday_day + breakdown.ot_saturday_night +
-           breakdown.ot_sunday_before_noon + breakdown.ot_sunday_after_noon +
-           breakdown.ot_dayoff_day + breakdown.ot_dayoff_night)
-    
+    ot3 = (
+        breakdown.ot_weekday_hour_5_plus
+        + breakdown.ot_weekend
+        + breakdown.ot_dayoff_day
+        + breakdown.ot_dayoff_night
+    )
     return ot1, ot2, ot3
 
 
-def group_records_by_week(records: list[DailyRecord]) -> Dict[Tuple[str, int, int], list[DailyRecord]]:
+# -----------------------------------------------------------------------
+# Per-day categorisation (weekday time-of-day + weekend)
+# -----------------------------------------------------------------------
+
+def categorize_day_entries_time_of_day(record: DailyRecord) -> OvertimeBreakdown:
     """
-    Group daily records by worker and ISO week.
-    
-    Args:
-        records: List of DailyRecord objects
-        
-    Returns:
-        Dictionary keyed by (worker_name, year, week_number) with list of records
+    Build a partial OvertimeBreakdown from a single day's entries.
+
+    For weekdays: splits into scheduled_day / scheduled_night (or dayoff rates).
+    For weekends: all hours go to ot_weekend.
+    Weekday tier counts (ot_weekday_hour_*) are left at 0 here because
+    those are assigned at the period level after summing all weekday hours.
     """
-    grouped: Dict[Tuple[str, int, int], list[DailyRecord]] = defaultdict(list)
-    
-    for record in records:
-        year = record.date.year
-        week = record.week_number
-        key = (record.worker_name, year, week)
-        grouped[key].append(record)
-    
-    # Sort records within each week by date
-    for key in grouped:
-        grouped[key].sort(key=lambda r: r.date)
-    
-    return grouped
+    from app.services.time_calculator import calculate_overtime_day_night_split
+
+    day_breakdown = OvertimeBreakdown()
+
+    if record.day_type in (DayType.SATURDAY, DayType.SUNDAY):
+        for entry in record.entries:
+            day_breakdown.ot_weekend += entry.total_hours
+        # Also include credited hours for weekend (rare, but consistent)
+        day_breakdown.ot_weekend += record.credited_hours
+        return day_breakdown
+
+    # Weekday — categorise by time of day (tier hours assigned at period level)
+    for entry in record.entries:
+        day_hours, night_hours = calculate_overtime_day_night_split(
+            entry.start_time, entry.end_time
+        )
+        if record.is_day_off:
+            day_breakdown.ot_dayoff_day += day_hours
+            day_breakdown.ot_dayoff_night += night_hours
+        else:
+            day_breakdown.ot_weekday_scheduled_day += day_hours
+            day_breakdown.ot_weekday_scheduled_night += night_hours
+
+    return day_breakdown
 
 
-def calculate_weekly_overtime(
+# -----------------------------------------------------------------------
+# Period calculation (main entry point per worker-period)
+# -----------------------------------------------------------------------
+
+def calculate_period_overtime(
     records: list[DailyRecord],
-    employee_type: EmployeeType = EmployeeType.SVEND
-) -> Tuple[WeeklySummary, list[DailyOutput]]:
+    employee_type: EmployeeType = EmployeeType.SVEND,
+) -> Tuple[PeriodSummary, list[DailyOutput]]:
     """
-    Calculate overtime for a single week's records according to DBR 2026 rules.
-    
-    According to Danish automotive industry collective agreement (DBR 2026):
-    - Daily norm: 7.5h Mon-Thu, 7.0h Fri (overtime calculated per day)
-    - Weekday overtime: Hourly thresholds reset daily (1st/2nd at lower rate, 3rd/4th, 5th+)
-    - Time-of-day: 06:00-18:00 vs 18:00-06:00 rates
-    - Saturday: Uses day-off rates, split by time of day
-    - Sunday: Split at 12:00 for different rates
-    
-    Args:
-        records: List of DailyRecord objects for a single week
-        employee_type: Type of employee for rate calculation
-        
-    Returns:
-        Tuple of (WeeklySummary, list of DailyOutput for each day)
+    Calculate overtime for a single 14-day period.
+
+    Rules:
+    - Weekend hours (Sat/Sun) are always OT Weekend at flat OT3 rate.
+      They do NOT count toward the 74h weekday norm.
+    - Weekday total (including credited absence hours) is compared to 74h.
+      Excess is classified into OT1 (first 2h), OT2 (next 2h), OT3 (rest).
+    - Weekday time-of-day tracking (scheduled_day / scheduled_night) is
+      maintained for detailed CSV / payment reporting, but tier assignment
+      happens at the period level.
     """
     if not records:
         return None, []
-    
+
     worker_name = records[0].worker_name
     year = records[0].date.year
-    week_number = records[0].week_number
-    
-    # Initialize tracking variables for weekly aggregation
-    weekly_total = 0.0
-    weekly_norm_total = 0.0
-    weekly_breakdown = OvertimeBreakdown()
-    
+    period_number = get_period_number(records[0].week_number)
+
+    # Sort by date for period_start / period_end derivation
+    sorted_records = sorted(records, key=lambda r: r.date)
+    period_start = sorted_records[0].date.strftime("%d-%m-%Y")
+    period_end = sorted_records[-1].date.strftime("%d-%m-%Y")
+
+    # Accumulate totals
+    period_total_hours = 0.0
+    period_weekday_hours = 0.0   # Only weekday hours (used vs 74h norm)
+    period_weekend_hours = 0.0   # Sat + Sun hours (always OT)
+
+    # Per-day time-of-day breakdown (accumulated for the period)
+    period_time_of_day_breakdown = OvertimeBreakdown()
+
     daily_outputs: list[DailyOutput] = []
-    
-    for record in records:
-        # Include both actual work hours and credited hours (vacation/sick/holiday)
+
+    for record in sorted_records:
         day_total = record.total_hours + record.credited_hours
-        
-        # Categorize this day's overtime (now self-contained per day)
-        day_breakdown, day_norm, day_ot = categorize_day_overtime(record)
-        
-        # Update weekly aggregation totals
-        weekly_total += day_total
-        weekly_norm_total += day_norm
-        weekly_breakdown = merge_overtime_breakdowns(weekly_breakdown, day_breakdown)
-        
-        # Calculate legacy overtime values for this day
-        day_ot1, day_ot2, day_ot3 = calculate_legacy_overtime_values(day_breakdown)
-        
-        # Detect call out eligibility for this day
+
+        if record.day_type in (DayType.SATURDAY, DayType.SUNDAY):
+            period_total_hours += day_total
+            period_weekend_hours += day_total
+        else:
+            period_total_hours += day_total
+            period_weekday_hours += day_total
+
+        # Build per-day time-of-day categorisation
+        day_tod_breakdown = categorize_day_entries_time_of_day(record)
+        period_time_of_day_breakdown = merge_overtime_breakdowns(
+            period_time_of_day_breakdown, day_tod_breakdown
+        )
+
+        # Detect call out eligibility
         has_call_out = detect_call_out_eligibility(record)
-        
-        # Create daily output record
+
+        # Per-day normal hours: min(day_total, daily_norm) for weekdays, 0 for weekends
+        daily_norm = get_credited_hours_for_day(record.date.weekday())
+        day_norm_hours = min(day_total, daily_norm) if record.day_type == DayType.WEEKDAY else 0.0
+
+        # Build per-day DailyOutput (weekend hours go into breakdown directly)
+        day_breakdown = OvertimeBreakdown()
+        if record.day_type in (DayType.SATURDAY, DayType.SUNDAY):
+            day_breakdown.ot_weekend = day_total
+        # Weekday tier values left at 0 — assigned at period level below
+
         output = DailyOutput(
             worker=worker_name,
             date=record.date.strftime("%d-%m-%Y"),
@@ -455,316 +333,289 @@ def calculate_weekly_overtime(
             total_hours=round(day_total, 2),
             hours_norm_time=round(record.hours_in_norm, 2),
             hours_outside_norm=round(record.hours_outside_norm, 2),
-            week_number=week_number,
-            weekly_total=round(weekly_total, 2),
-            normal_hours=round(day_norm, 2),
+            week_number=record.week_number,
+            period_number=period_number,
+            normal_hours=round(day_norm_hours, 2),
             overtime_breakdown=day_breakdown,
-            overtime_1=round(day_ot1, 2),
-            overtime_2=round(day_ot2, 2),
-            overtime_3=round(day_ot3, 2),
             has_call_out_qualifying_time=has_call_out,
             call_out_payment=0.0,
             call_out_applied=False,
-            entries=record.entries
+            entries=record.entries,
         )
         daily_outputs.append(output)
-    
-    # Calculate legacy overtime values for weekly summary
-    week_ot1, week_ot2, week_ot3 = calculate_legacy_overtime_values(weekly_breakdown)
-    
-    # Create weekly summary
-    summary = WeeklySummary(
-        worker_name=worker_name,
-        week_number=week_number,
-        year=year,
-        total_hours=round(weekly_total, 2),
-        normal_hours=round(weekly_norm_total, 2),
-        overtime_breakdown=weekly_breakdown,
-        overtime_1=round(week_ot1, 2),
-        overtime_2=round(week_ot2, 2),
-        overtime_3=round(week_ot3, 2)
+
+    # ------------------------------------------------------------------
+    # Period-level overtime calculation
+    # ------------------------------------------------------------------
+    normal_hours = min(period_weekday_hours, PERIOD_NORM_HOURS)
+    weekday_ot = max(0.0, period_weekday_hours - PERIOD_NORM_HOURS)
+
+    # Distribute weekday overtime across tiers
+    ot1, ot2, ot3_weekday = apply_hourly_thresholds(weekday_ot)
+
+    # Build the final period breakdown
+    period_breakdown = OvertimeBreakdown(
+        ot_weekday_hour_1_2=round(ot1, 2),
+        ot_weekday_hour_3_4=round(ot2, 2),
+        ot_weekday_hour_5_plus=round(ot3_weekday, 2),
+        ot_weekday_scheduled_day=round(period_time_of_day_breakdown.ot_weekday_scheduled_day, 2),
+        ot_weekday_scheduled_night=round(period_time_of_day_breakdown.ot_weekday_scheduled_night, 2),
+        ot_dayoff_day=round(period_time_of_day_breakdown.ot_dayoff_day, 2),
+        ot_dayoff_night=round(period_time_of_day_breakdown.ot_dayoff_night, 2),
+        ot_weekend=round(period_weekend_hours, 2),
     )
-    
+
+    period_ot1, period_ot2, period_ot3 = calculate_ot_values_from_breakdown(period_breakdown)
+
+    summary = PeriodSummary(
+        worker_name=worker_name,
+        period_number=period_number,
+        period_start=period_start,
+        period_end=period_end,
+        year=year,
+        total_hours=round(period_total_hours, 2),
+        weekday_hours=round(period_weekday_hours, 2),
+        normal_hours=round(normal_hours, 2),
+        overtime_breakdown=period_breakdown,
+        overtime_1=round(period_ot1, 2),
+        overtime_2=round(period_ot2, 2),
+        overtime_3=round(period_ot3, 2),
+    )
+
     return summary, daily_outputs
 
 
-def recalculate_overtime_with_callout(
+# -----------------------------------------------------------------------
+# Process all records
+# -----------------------------------------------------------------------
+
+def process_all_records(
+    records: list[DailyRecord],
+    employee_type: EmployeeType = EmployeeType.SVEND,
+) -> Tuple[list[PeriodSummary], list[DailyOutput]]:
+    """
+    Process all daily records and calculate overtime by 14-day period.
+
+    Returns:
+        (list of PeriodSummary, list of DailyOutput)
+    """
+    grouped = group_records_by_period(records)
+
+    all_summaries: list[PeriodSummary] = []
+    all_outputs: list[DailyOutput] = []
+
+    for key in sorted(grouped.keys()):
+        period_records = grouped[key]
+        summary, outputs = calculate_period_overtime(period_records, employee_type)
+
+        if summary:
+            all_summaries.append(summary)
+        all_outputs.extend(outputs)
+
+    return all_summaries, all_outputs
+
+
+# -----------------------------------------------------------------------
+# Recalculate period summaries from DailyOutputs
+# (used after absence marking / half sick day application)
+# -----------------------------------------------------------------------
+
+def recalculate_period_summaries(outputs: list[DailyOutput]) -> list[PeriodSummary]:
+    """
+    Recalculate period summaries from a flat list of DailyOutput objects.
+
+    Used when daily records are updated (e.g. absence marking, half sick day).
+    """
+    grouped: Dict[Tuple[str, int, int], list[DailyOutput]] = defaultdict(list)
+
+    for output in outputs:
+        key = (output.worker, output.year if hasattr(output, 'year') else int(output.date.split('-')[2]), output.period_number)
+        grouped[key].append(output)
+
+    summaries: list[PeriodSummary] = []
+
+    for (worker_name, year, period_number), period_outputs in sorted(grouped.items()):
+        period_outputs_sorted = sorted(period_outputs, key=lambda o: o.date)
+
+        total_hours = 0.0
+        weekday_hours = 0.0
+        weekend_hours = 0.0
+        time_of_day_breakdown = OvertimeBreakdown()
+
+        period_start = period_outputs_sorted[0].date
+        period_end = period_outputs_sorted[-1].date
+
+        for out in period_outputs_sorted:
+            total_hours += out.total_hours
+            if out.day_type in ('Saturday', 'Sunday'):
+                weekend_hours += out.total_hours
+            else:
+                weekday_hours += out.total_hours
+
+            time_of_day_breakdown = merge_overtime_breakdowns(
+                time_of_day_breakdown, out.overtime_breakdown
+            )
+
+        normal_hours = min(weekday_hours, PERIOD_NORM_HOURS)
+        weekday_ot = max(0.0, weekday_hours - PERIOD_NORM_HOURS)
+        ot1, ot2, ot3_weekday = apply_hourly_thresholds(weekday_ot)
+
+        period_breakdown = OvertimeBreakdown(
+            ot_weekday_hour_1_2=round(ot1, 2),
+            ot_weekday_hour_3_4=round(ot2, 2),
+            ot_weekday_hour_5_plus=round(ot3_weekday, 2),
+            ot_weekday_scheduled_day=round(time_of_day_breakdown.ot_weekday_scheduled_day, 2),
+            ot_weekday_scheduled_night=round(time_of_day_breakdown.ot_weekday_scheduled_night, 2),
+            ot_dayoff_day=round(time_of_day_breakdown.ot_dayoff_day, 2),
+            ot_dayoff_night=round(time_of_day_breakdown.ot_dayoff_night, 2),
+            ot_weekend=round(weekend_hours, 2),
+        )
+
+        period_ot1, period_ot2, period_ot3 = calculate_ot_values_from_breakdown(period_breakdown)
+
+        summary = PeriodSummary(
+            worker_name=worker_name,
+            period_number=period_number,
+            period_start=period_start,
+            period_end=period_end,
+            year=year,
+            total_hours=round(total_hours, 2),
+            weekday_hours=round(weekday_hours, 2),
+            normal_hours=round(normal_hours, 2),
+            overtime_breakdown=period_breakdown,
+            overtime_1=round(period_ot1, 2),
+            overtime_2=round(period_ot2, 2),
+            overtime_3=round(period_ot3, 2),
+        )
+        summaries.append(summary)
+
+    return summaries
+
+
+# -----------------------------------------------------------------------
+# Apply half sick day
+# -----------------------------------------------------------------------
+
+def apply_half_sick_day(record: DailyRecord) -> DailyRecord:
+    """
+    Top up a partially-worked day to the full daily norm with sick hours.
+
+    For example: if a worker worked 4h on Monday (norm 7.5h), this adds
+    3.5h of credited sick hours so the day counts as 7.5h for OT purposes.
+
+    Args:
+        record: DailyRecord to top up (must be a weekday with actual entries)
+
+    Returns:
+        Updated DailyRecord with credited_hours set to the top-up amount
+    """
+    daily_norm = get_credited_hours_for_day(record.date.weekday())
+    if daily_norm == 0.0 or record.day_type != DayType.WEEKDAY:
+        return record  # Weekend days cannot have half sick day top-up
+
+    worked = record.total_hours
+    top_up = max(0.0, daily_norm - worked)
+    record.credited_hours = top_up
+    record.absent_type = AbsentType.SICK
+    return record
+
+
+# -----------------------------------------------------------------------
+# Call-out recalculation (adapted for period-based breakdown)
+# -----------------------------------------------------------------------
+
+def recalculate_with_callout(
     output: DailyOutput,
-    daily_record: DailyRecord
+    daily_record: DailyRecord,
 ) -> DailyOutput:
     """
-    Recalculate overtime for a day with confirmed call-out, applying special rules:
+    Recalculate a daily output for a confirmed call-out day.
+
+    Rules:
     - 2-hour minimum for call-out qualifying entries
-    - All call-out overtime classified as OT 3
-    
-    Args:
-        output: Original DailyOutput from normal overtime calculation
-        daily_record: Original DailyRecord with time entries
-        
-    Returns:
-        Updated DailyOutput with call-out overtime rules applied
+    - All call-out overtime goes into ot_weekday_hour_5_plus (OT3) in the
+      per-day breakdown; this propagates correctly when the period summary
+      is recalculated from daily outputs.
     """
     from app.services.call_out_detector import get_call_out_qualifying_entries
     from app.services.time_calculator import calculate_overtime_day_night_split
-    
-    # Get indices of call-out qualifying entries
+
     qualifying_indices = get_call_out_qualifying_entries(daily_record)
-    
-    # If no qualifying entries, return unchanged (shouldn't happen if call-out is confirmed)
     if not qualifying_indices:
         return output
-    
-    # Calculate total hours from call-out qualifying entries
+
     callout_hours = 0.0
     callout_entries = []
     other_hours = 0.0
-    
+
     for idx, entry in enumerate(daily_record.entries):
         if idx in qualifying_indices:
             callout_hours += entry.total_hours
             callout_entries.append(entry)
         else:
             other_hours += entry.total_hours
-    
-    # Apply 2-hour minimum to call-out entries
+
     original_callout_hours = callout_hours
     if callout_hours < 2.0:
         callout_hours = 2.0
-    
-    # Calculate new total hours
+
     total_hours = callout_hours + other_hours
-    
-    # Get daily norm based on weekday
     daily_norm = get_credited_hours_for_day(daily_record.date.weekday())
-    
-    # Calculate how much overtime exists
-    total_overtime = max(0, total_hours - daily_norm)
-    
-    # Initialize new overtime breakdown
+    total_overtime = max(0.0, total_hours - daily_norm)
+
     new_breakdown = OvertimeBreakdown()
-    
-    # Strategy: All call-out hours above the daily norm go to OT 3
-    # Other hours follow normal rules
-    
+
     if total_overtime == 0:
-        # No overtime, just update total hours if minimum was applied
         output.total_hours = round(total_hours, 2)
         return output
-    
-    # Determine how overtime is split between call-out and other work
-    # We prioritize call-out hours as overtime (they get OT 3 classification)
-    
-    callout_overtime = 0.0
-    other_overtime = 0.0
-    
-    if total_overtime > 0:
-        # Prioritize call-out hours as overtime up to the total amount available
-        callout_overtime = min(callout_hours, total_overtime)
-        other_overtime = max(0, total_overtime - callout_overtime)
-    
-    # Classify call-out overtime as OT 3 (highest tier)
-    # We need to maintain day/night split for payment calculations
+
+    callout_overtime = min(callout_hours, total_overtime)
+    other_overtime = max(0.0, total_overtime - callout_overtime)
+
     if callout_overtime > 0:
-        # Calculate day/night split for call-out entries
         total_callout_day = 0.0
         total_callout_night = 0.0
-        
         for entry in callout_entries:
-            day_hours, night_hours = calculate_overtime_day_night_split(
-                entry.start_time, entry.end_time
-            )
-            total_callout_day += day_hours
-            total_callout_night += night_hours
-        
-        # If we applied the 2-hour minimum, scale the day/night split proportionally
+            d, n = calculate_overtime_day_night_split(entry.start_time, entry.end_time)
+            total_callout_day += d
+            total_callout_night += n
+
         if original_callout_hours > 0 and original_callout_hours < 2.0:
-            scale_factor = callout_hours / original_callout_hours
-            total_callout_day *= scale_factor
-            total_callout_night *= scale_factor
-        
-        # Now we need to extract just the overtime portion
-        # If callout_overtime < callout_hours, we need to scale down
+            scale = callout_hours / original_callout_hours
+            total_callout_day *= scale
+            total_callout_night *= scale
+
         if callout_hours > 0:
             ot_scale = callout_overtime / callout_hours
-            callout_day_ot = total_callout_day * ot_scale
-            callout_night_ot = total_callout_night * ot_scale
+            day_ot = total_callout_day * ot_scale
+            night_ot = total_callout_night * ot_scale
         else:
-            callout_day_ot = 0.0
-            callout_night_ot = 0.0
-        
-        # For weekdays, we track both hourly tiers AND time-of-day
-        # Call-out OT goes to weekday_hour_5_plus (OT 3 tier)
-        new_breakdown.ot_weekday_hour_5_plus = callout_overtime
-        
-        # Also track day/night for payment rates
-        # Use scheduled rates since this is a call-out on a working day
-        if daily_record.day_type == DayType.WEEKDAY and not daily_record.is_day_off:
-            new_breakdown.ot_weekday_scheduled_day = callout_day_ot
-            new_breakdown.ot_weekday_scheduled_night = callout_night_ot
-        elif daily_record.day_type == DayType.SATURDAY:
-            new_breakdown.ot_saturday_day = callout_day_ot
-            new_breakdown.ot_saturday_night = callout_night_ot
-        elif daily_record.day_type == DayType.SUNDAY:
-            # For Sunday, we'd need to split by noon, but for simplicity
-            # we'll put it all in after_noon (higher rate)
-            new_breakdown.ot_sunday_after_noon = callout_overtime
+            day_ot = night_ot = 0.0
+
+        if daily_record.day_type in (DayType.SATURDAY, DayType.SUNDAY):
+            new_breakdown.ot_weekend = callout_overtime
         elif daily_record.is_day_off:
-            new_breakdown.ot_dayoff_day = callout_day_ot
-            new_breakdown.ot_dayoff_night = callout_night_ot
-    
-    # Classify other overtime using normal rules
-    if other_overtime > 0:
-        # Apply hourly thresholds for weekday non-call-out overtime
-        if daily_record.day_type == DayType.WEEKDAY and not daily_record.is_day_off:
-            ot_1_2, ot_3_4, ot_5_plus = apply_hourly_thresholds(other_overtime, 0.0)
-            new_breakdown.ot_weekday_hour_1_2 += ot_1_2
-            new_breakdown.ot_weekday_hour_3_4 += ot_3_4
-            new_breakdown.ot_weekday_hour_5_plus += ot_5_plus
-        
-        # Also categorize by time of day for non-call-out entries
+            new_breakdown.ot_dayoff_day = day_ot
+            new_breakdown.ot_dayoff_night = night_ot
+        else:
+            # Call-out goes to tier 5+ (OT3) in weekday breakdown
+            new_breakdown.ot_weekday_hour_5_plus = callout_overtime
+            new_breakdown.ot_weekday_scheduled_day = day_ot
+            new_breakdown.ot_weekday_scheduled_night = night_ot
+
+    if other_overtime > 0 and daily_record.day_type == DayType.WEEKDAY and not daily_record.is_day_off:
+        # Other weekday overtime keeps tier assignment deferred to period level
+        # but we record time-of-day split
         for idx, entry in enumerate(daily_record.entries):
             if idx not in qualifying_indices:
-                day_hours, night_hours = calculate_overtime_day_night_split(
-                    entry.start_time, entry.end_time
-                )
-                
-                # Scale to just the overtime portion if needed
-                entry_total = entry.total_hours
-                if entry_total > 0 and other_overtime < other_hours:
-                    ot_scale = other_overtime / other_hours
-                    day_hours *= ot_scale
-                    night_hours *= ot_scale
-                
-                if daily_record.day_type == DayType.WEEKDAY and not daily_record.is_day_off:
-                    new_breakdown.ot_weekday_scheduled_day += day_hours
-                    new_breakdown.ot_weekday_scheduled_night += night_hours
-                elif daily_record.day_type == DayType.SATURDAY:
-                    new_breakdown.ot_saturday_day += day_hours
-                    new_breakdown.ot_saturday_night += night_hours
-                elif daily_record.day_type == DayType.SUNDAY:
-                    from app.services.time_calculator import calculate_sunday_noon_split
-                    before_noon, after_noon = calculate_sunday_noon_split(
-                        entry.start_time, entry.end_time
-                    )
-                    if entry_total > 0 and other_overtime < other_hours:
-                        ot_scale = other_overtime / other_hours
-                        before_noon *= ot_scale
-                        after_noon *= ot_scale
-                    new_breakdown.ot_sunday_before_noon += before_noon
-                    new_breakdown.ot_sunday_after_noon += after_noon
-                elif daily_record.is_day_off:
-                    new_breakdown.ot_dayoff_day += day_hours
-                    new_breakdown.ot_dayoff_night += night_hours
-    
-    # Calculate legacy overtime values
-    ot1, ot2, ot3 = calculate_legacy_overtime_values(new_breakdown)
-    
-    # Update the output
+                d, n = calculate_overtime_day_night_split(entry.start_time, entry.end_time)
+                if other_hours > 0 and other_overtime < other_hours:
+                    scale = other_overtime / other_hours
+                    d *= scale
+                    n *= scale
+                new_breakdown.ot_weekday_scheduled_day += d
+                new_breakdown.ot_weekday_scheduled_night += n
+
     output.total_hours = round(total_hours, 2)
     output.overtime_breakdown = new_breakdown
-    output.overtime_1 = round(ot1, 2)
-    output.overtime_2 = round(ot2, 2)
-    output.overtime_3 = round(ot3, 2)
-    
     return output
-
-
-def process_all_records(
-    records: list[DailyRecord],
-    employee_type: EmployeeType = EmployeeType.SVEND
-) -> Tuple[list[WeeklySummary], list[DailyOutput]]:
-    """
-    Process all daily records and calculate overtime for each week.
-    
-    Args:
-        records: List of all DailyRecord objects
-        employee_type: Type of employee for rate calculation
-        
-    Returns:
-        Tuple of (list of WeeklySummary, list of DailyOutput)
-    """
-    # Group records by worker and week
-    grouped = group_records_by_week(records)
-    
-    all_summaries: list[WeeklySummary] = []
-    all_outputs: list[DailyOutput] = []
-    
-    # Process each week
-    for key in sorted(grouped.keys()):
-        week_records = grouped[key]
-        summary, outputs = calculate_weekly_overtime(week_records, employee_type)
-        
-        if summary:
-            all_summaries.append(summary)
-        all_outputs.extend(outputs)
-    
-    return all_summaries, all_outputs
-
-
-def recalculate_weekly_summaries(outputs: list[DailyOutput]) -> list[WeeklySummary]:
-    """
-    Recalculate weekly summaries from daily outputs.
-    Used when daily hours are updated (e.g., absence marking).
-    
-    Args:
-        outputs: List of DailyOutput objects
-        
-    Returns:
-        List of WeeklySummary objects
-    """
-    # Group by worker and week
-    grouped: Dict[Tuple[str, int, int], list[DailyOutput]] = defaultdict(list)
-    
-    for output in outputs:
-        # Parse year from date string (DD-MM-YYYY)
-        date_parts = output.date.split('-')
-        year = int(date_parts[2])
-        key = (output.worker, year, output.week_number)
-        grouped[key].append(output)
-    
-    summaries: list[WeeklySummary] = []
-    
-    # Process each week
-    for (worker_name, year, week_number), week_outputs in sorted(grouped.items()):
-        # Calculate weekly totals
-        weekly_total = 0.0
-        weekly_norm_used = 0.0
-        weekly_ot_hours = 0.0
-        weekly_breakdown = OvertimeBreakdown()
-        
-        for output in week_outputs:
-            weekly_total += output.total_hours
-            weekly_norm_used += output.normal_hours
-            
-            # Sum up overtime from breakdown
-            ot_from_breakdown = (
-                output.overtime_breakdown.ot_weekday_hour_1_2 +
-                output.overtime_breakdown.ot_weekday_hour_3_4 +
-                output.overtime_breakdown.ot_weekday_hour_5_plus +
-                output.overtime_breakdown.ot_saturday_day +
-                output.overtime_breakdown.ot_saturday_night +
-                output.overtime_breakdown.ot_sunday_before_noon +
-                output.overtime_breakdown.ot_sunday_after_noon
-            )
-            weekly_ot_hours += ot_from_breakdown
-            
-            # Merge overtime breakdowns
-            weekly_breakdown = merge_overtime_breakdowns(weekly_breakdown, output.overtime_breakdown)
-        
-        # Calculate legacy overtime values
-        week_ot1, week_ot2, week_ot3 = calculate_legacy_overtime_values(weekly_breakdown)
-        
-        summary = WeeklySummary(
-            worker_name=worker_name,
-            week_number=week_number,
-            year=year,
-            total_hours=round(weekly_total, 2),
-            normal_hours=round(weekly_norm_used, 2),
-            overtime_breakdown=weekly_breakdown,
-            overtime_1=round(week_ot1, 2),
-            overtime_2=round(week_ot2, 2),
-            overtime_3=round(week_ot3, 2)
-        )
-        summaries.append(summary)
-    
-    return summaries

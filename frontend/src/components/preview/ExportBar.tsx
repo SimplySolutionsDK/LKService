@@ -22,8 +22,8 @@ interface ExportBarProps {
 const formatOptions = [
   { value: 'daily', label: 'Daglig oversigt (standard)' },
   { value: 'detailed', label: 'Daglig oversigt (detaljeret DBR 2026)' },
-  { value: 'weekly', label: 'Ugentlig opsummering' },
-  { value: 'weekly_detailed', label: 'Ugentlig opsummering (detaljeret)' },
+  { value: 'period', label: '14-Dages periode opsummering' },
+  { value: 'period_detailed', label: '14-Dages periode opsummering (detaljeret)' },
   { value: 'combined', label: 'Kombineret (begge)' },
 ];
 

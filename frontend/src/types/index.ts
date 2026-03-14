@@ -11,10 +11,11 @@ export interface OvertimeBreakdown {
   ot_weekday_hour_1_2: number;
   ot_weekday_hour_3_4: number;
   ot_weekday_hour_5_plus: number;
-  ot_saturday_day: number;
-  ot_saturday_night: number;
-  ot_sunday_before_noon: number;
-  ot_sunday_after_noon: number;
+  ot_weekday_scheduled_day: number;
+  ot_weekday_scheduled_night: number;
+  ot_dayoff_day: number;
+  ot_dayoff_night: number;
+  ot_weekend: number;  // Saturday + Sunday combined, flat OT3 rate
 }
 
 export interface DailyRecord {
@@ -29,15 +30,24 @@ export interface DailyRecord {
   entries: TimeEntry[];
   absent_type?: AbsenceType;
   credited_hours?: number;
+  half_sick_hours?: number;
+  week_number: number;
+  period_number: number;
 }
 
-export interface WeeklyRecord {
+export interface PeriodRecord {
   worker_name: string;
   year: number;
-  week_number: number;
+  period_number: number;
+  period_start: string;   // DD-MM-YYYY
+  period_end: string;     // DD-MM-YYYY
   total_hours: number;
-  normal_hours: number;
+  weekday_hours: number;  // Only weekday hours (used vs 74h norm)
+  normal_hours: number;   // min(weekday_hours, 74)
   overtime_breakdown: OvertimeBreakdown;
+  overtime_1: number;
+  overtime_2: number;
+  overtime_3: number;
 }
 
 export interface PreviewData {
@@ -45,14 +55,14 @@ export interface PreviewData {
   session_id: string;
   total_records: number;
   daily: DailyRecord[];
-  weekly: WeeklyRecord[];
+  periods: PeriodRecord[];
 }
 
 export type EmployeeType = 'Svend' | 'Lærling' | 'Funktionær' | 'Elev';
 
-export type OutputFormat = 'daily' | 'detailed' | 'weekly' | 'weekly_detailed' | 'combined';
+export type OutputFormat = 'daily' | 'detailed' | 'period' | 'period_detailed' | 'combined';
 
-export type TabType = 'daily' | 'weekly';
+export type TabType = 'daily' | 'period';
 
 export interface CallOutSelections {
   [date: string]: boolean;
@@ -63,6 +73,16 @@ export type AbsenceType = 'None' | 'Vacation' | 'Sick' | 'Kursus';
 export interface AbsenceSelections {
   [date: string]: AbsenceType;
 }
+
+// Overtime override values keyed by "{workerName}__{year}__{periodNumber}"
+export type OvertimeOverrides = {
+  [periodKey: string]: {
+    overtime_1?: number;
+    overtime_2?: number;
+    overtime_3?: number;
+    ot_weekend?: number;
+  };
+};
 
 export interface StatusMessage {
   type: 'success' | 'error' | 'loading';

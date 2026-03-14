@@ -1,11 +1,12 @@
-import type { 
-  PreviewData, 
-  EmployeeType, 
-  OutputFormat, 
-  CallOutSelections, 
+import type {
+  PreviewData,
+  EmployeeType,
+  OutputFormat,
+  CallOutSelections,
   AbsenceSelections,
+  OvertimeOverrides,
   EmployeeSearchResponse,
-  ApiFetchParams
+  ApiFetchParams,
 } from '../types';
 
 export const api = {
@@ -52,18 +53,50 @@ export const api = {
   async markAbsence(sessionId: string, absenceSelections: AbsenceSelections): Promise<PreviewData> {
     const formData = new FormData();
     formData.append('absence_selections', JSON.stringify(absenceSelections));
-    
+
     const response = await fetch(`/api/mark-absence/${sessionId}`, {
       method: 'POST',
       body: formData,
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to mark absence');
     }
-    
+
     return response.json();
+  },
+
+  async markHalfSickDay(sessionId: string, date: string): Promise<PreviewData> {
+    const formData = new FormData();
+    formData.append('date', date);
+
+    const response = await fetch(`/api/half-sick-day/${sessionId}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to apply half sick day');
+    }
+
+    return response.json();
+  },
+
+  async saveOvertimeOverrides(sessionId: string, overrides: OvertimeOverrides): Promise<void> {
+    const formData = new FormData();
+    formData.append('overrides', JSON.stringify(overrides));
+
+    const response = await fetch(`/api/overtime-overrides/${sessionId}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to save overtime overrides');
+    }
   },
 
   getFilename(response: Response): string {

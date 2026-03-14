@@ -3,22 +3,14 @@ from io import StringIO
 from typing import List
 from datetime import datetime
 
-from app.models.schemas import DailyOutput, WeeklySummary
+from app.models.schemas import DailyOutput, PeriodSummary
 from app.services.overtime_calculator import get_overtime_rates
 
 
 def generate_daily_csv(outputs: List[DailyOutput]) -> str:
-    """
-    Generate CSV content from daily output records.
-    
-    Args:
-        outputs: List of DailyOutput objects
-        
-    Returns:
-        CSV content as string
-    """
+    """Generate CSV content from daily output records."""
     output = StringIO()
-    
+
     fieldnames = [
         "Medarbejder",
         "Dato",
@@ -28,17 +20,15 @@ def generate_daily_csv(outputs: List[DailyOutput]) -> str:
         "TimerNormtid",
         "TimerUdenforNorm",
         "UgeNummer",
-        "UgeTotal",
+        "PeriodeNummer",
         "NormaleTimer",
-        "Overtid1",
-        "Overtid2",
-        "Overtid3",
-        "CallOutBetaling"
+        "OT_Weekend",
+        "CallOutBetaling",
     ]
-    
+
     writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";")
     writer.writeheader()
-    
+
     for record in outputs:
         writer.writerow({
             "Medarbejder": record.worker,
@@ -49,92 +39,77 @@ def generate_daily_csv(outputs: List[DailyOutput]) -> str:
             "TimerNormtid": f"{record.hours_norm_time:.2f}",
             "TimerUdenforNorm": f"{record.hours_outside_norm:.2f}",
             "UgeNummer": record.week_number,
-            "UgeTotal": f"{record.weekly_total:.2f}",
+            "PeriodeNummer": record.period_number,
             "NormaleTimer": f"{record.normal_hours:.2f}",
-            "Overtid1": f"{record.overtime_1:.2f}",
-            "Overtid2": f"{record.overtime_2:.2f}",
-            "Overtid3": f"{record.overtime_3:.2f}",
-            "CallOutBetaling": f"{record.call_out_payment:.2f}"
+            "OT_Weekend": f"{record.overtime_breakdown.ot_weekend:.2f}",
+            "CallOutBetaling": f"{record.call_out_payment:.2f}",
         })
-    
+
     return output.getvalue()
 
 
-def generate_weekly_summary_csv(summaries: List[WeeklySummary]) -> str:
-    """
-    Generate CSV content from weekly summary records.
-    
-    Args:
-        summaries: List of WeeklySummary objects
-        
-    Returns:
-        CSV content as string
-    """
+def generate_period_summary_csv(summaries: List[PeriodSummary]) -> str:
+    """Generate CSV content from 14-day period summary records."""
     output = StringIO()
-    
+
     fieldnames = [
         "Medarbejder",
         "År",
-        "UgeNummer",
+        "PeriodeNummer",
+        "PeriodeStart",
+        "PeriodeSlut",
         "TotalTimer",
+        "HverdageTimer",
         "NormaleTimer",
         "Overtid1",
         "Overtid2",
-        "Overtid3"
+        "Overtid3",
+        "OT_Weekend",
     ]
-    
+
     writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";")
     writer.writeheader()
-    
+
     for summary in summaries:
+        otb = summary.overtime_breakdown
         writer.writerow({
             "Medarbejder": summary.worker_name,
             "År": summary.year,
-            "UgeNummer": summary.week_number,
+            "PeriodeNummer": summary.period_number,
+            "PeriodeStart": summary.period_start,
+            "PeriodeSlut": summary.period_end,
             "TotalTimer": f"{summary.total_hours:.2f}",
+            "HverdageTimer": f"{summary.weekday_hours:.2f}",
             "NormaleTimer": f"{summary.normal_hours:.2f}",
             "Overtid1": f"{summary.overtime_1:.2f}",
             "Overtid2": f"{summary.overtime_2:.2f}",
-            "Overtid3": f"{summary.overtime_3:.2f}"
+            "Overtid3": f"{summary.overtime_3:.2f}",
+            "OT_Weekend": f"{otb.ot_weekend:.2f}",
         })
-    
+
     return output.getvalue()
 
 
-def generate_combined_csv(outputs: List[DailyOutput], summaries: List[WeeklySummary]) -> str:
-    """
-    Generate a combined CSV with daily records and weekly summaries.
-    
-    Args:
-        outputs: List of DailyOutput objects
-        summaries: List of WeeklySummary objects
-        
-    Returns:
-        CSV content as string with both daily and weekly data
-    """
+def generate_combined_csv(outputs: List[DailyOutput], summaries: List[PeriodSummary]) -> str:
+    """Generate a combined CSV with daily records and period summaries."""
     daily_csv = generate_daily_csv(outputs)
-    
-    # Add a separator and weekly summary
     combined = daily_csv
     combined += "\n\n"
-    combined += "UGENTLIG OPSUMMERING\n"
-    combined += generate_weekly_summary_csv(summaries)
-    
+    combined += "14-DAGES PERIODE OPSUMMERING\n"
+    combined += generate_period_summary_csv(summaries)
     return combined
 
 
 def generate_detailed_daily_csv(outputs: List[DailyOutput]) -> str:
     """
     Generate detailed CSV with overtime breakdown, rates, and payments (DBR 2026).
-    
-    Args:
-        outputs: List of DailyOutput objects
-        
-    Returns:
-        CSV content as string with detailed overtime categories
+
+    Weekday OT tiers (OT1/OT2/OT3) are a period-level concept, so they appear
+    in the detailed period summary CSV, not here. Daily detail focuses on
+    weekend hours and time-of-day breakdowns for weekdays.
     """
     output = StringIO()
-    
+
     fieldnames = [
         "Medarbejder",
         "Dato",
@@ -142,17 +117,8 @@ def generate_detailed_daily_csv(outputs: List[DailyOutput]) -> str:
         "Dagtype",
         "TotalTimer",
         "NormaleTimer",
-        # Weekday hourly thresholds
-        "OT_Hvd_1-2_Timer",
-        "OT_Hvd_1-2_Rate",
-        "OT_Hvd_1-2_Betaling",
-        "OT_Hvd_3-4_Timer",
-        "OT_Hvd_3-4_Rate",
-        "OT_Hvd_3-4_Betaling",
-        "OT_Hvd_5+_Timer",
-        "OT_Hvd_5+_Rate",
-        "OT_Hvd_5+_Betaling",
-        # Time-of-day scheduled
+        "HalvSygTimer",
+        # Time-of-day scheduled work
         "OT_Hvd_Dag_Timer",
         "OT_Hvd_Dag_Rate",
         "OT_Hvd_Dag_Betaling",
@@ -166,65 +132,29 @@ def generate_detailed_daily_csv(outputs: List[DailyOutput]) -> str:
         "OT_Fridag_Nat_Timer",
         "OT_Fridag_Nat_Rate",
         "OT_Fridag_Nat_Betaling",
-        # Saturday
-        "OT_Lør_Dag_Timer",
-        "OT_Lør_Dag_Rate",
-        "OT_Lør_Dag_Betaling",
-        "OT_Lør_Nat_Timer",
-        "OT_Lør_Nat_Rate",
-        "OT_Lør_Nat_Betaling",
-        # Sunday
-        "OT_Søn_Før12_Timer",
-        "OT_Søn_Før12_Rate",
-        "OT_Søn_Før12_Betaling",
-        "OT_Søn_Efter12_Timer",
-        "OT_Søn_Efter12_Rate",
-        "OT_Søn_Efter12_Betaling",
+        # Weekend (flat OT3 rate)
+        "OT_Weekend_Timer",
+        "OT_Weekend_Rate",
+        "OT_Weekend_Betaling",
         # Totals
-        "OT_Total_Timer",
-        "OT_Total_Betaling",
         "CallOutBetaling",
-        "Total_Betaling"
     ]
-    
+
     writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";")
     writer.writeheader()
-    
+
     for record in outputs:
-        # Parse date to get applicable rates
         date_obj = datetime.strptime(record.date, "%d-%m-%Y").date()
         rates = get_overtime_rates(date_obj)
-        
-        breakdown = record.overtime_breakdown
-        
-        # Calculate payments for each category
-        pay_hvd_1_2 = breakdown.ot_weekday_hour_1_2 * rates['weekday_hour_1_2']
-        pay_hvd_3_4 = breakdown.ot_weekday_hour_3_4 * rates['weekday_hour_3_4']
-        pay_hvd_5_plus = breakdown.ot_weekday_hour_5_plus * rates['weekday_hour_5_plus']
-        pay_hvd_dag = breakdown.ot_weekday_scheduled_day * rates['weekday_scheduled_day']
-        pay_hvd_nat = breakdown.ot_weekday_scheduled_night * rates['weekday_scheduled_night']
-        pay_fridag_dag = breakdown.ot_dayoff_day * rates['dayoff_day']
-        pay_fridag_nat = breakdown.ot_dayoff_night * rates['dayoff_night']
-        pay_lør_dag = breakdown.ot_saturday_day * rates['saturday_day']
-        pay_lør_nat = breakdown.ot_saturday_night * rates['saturday_night']
-        pay_søn_før12 = breakdown.ot_sunday_before_noon * rates['sunday_before_noon']
-        pay_søn_efter12 = breakdown.ot_sunday_after_noon * rates['sunday_after_noon']
-        
-        # Total overtime hours and payment
-        total_ot_hours = (
-            breakdown.ot_weekday_hour_1_2 + breakdown.ot_weekday_hour_3_4 + 
-            breakdown.ot_weekday_hour_5_plus + breakdown.ot_saturday_day + 
-            breakdown.ot_saturday_night + breakdown.ot_sunday_before_noon + 
-            breakdown.ot_sunday_after_noon + breakdown.ot_dayoff_day + 
-            breakdown.ot_dayoff_night
-        )
-        total_ot_payment = (
-            pay_hvd_1_2 + pay_hvd_3_4 + pay_hvd_5_plus + pay_hvd_dag + 
-            pay_hvd_nat + pay_fridag_dag + pay_fridag_nat + pay_lør_dag + 
-            pay_lør_nat + pay_søn_før12 + pay_søn_efter12
-        )
-        total_payment = total_ot_payment + record.call_out_payment
-        
+
+        bd = record.overtime_breakdown
+
+        pay_hvd_dag = bd.ot_weekday_scheduled_day * rates['weekday_scheduled_day']
+        pay_hvd_nat = bd.ot_weekday_scheduled_night * rates['weekday_scheduled_night']
+        pay_fridag_dag = bd.ot_dayoff_day * rates['dayoff_day']
+        pay_fridag_nat = bd.ot_dayoff_night * rates['dayoff_night']
+        pay_weekend = bd.ot_weekend * rates['weekend']
+
         writer.writerow({
             "Medarbejder": record.worker,
             "Dato": record.date,
@@ -232,106 +162,108 @@ def generate_detailed_daily_csv(outputs: List[DailyOutput]) -> str:
             "Dagtype": record.day_type,
             "TotalTimer": f"{record.total_hours:.2f}",
             "NormaleTimer": f"{record.normal_hours:.2f}",
-            # Weekday hourly thresholds
-            "OT_Hvd_1-2_Timer": f"{breakdown.ot_weekday_hour_1_2:.2f}",
-            "OT_Hvd_1-2_Rate": f"{rates['weekday_hour_1_2']:.2f}",
-            "OT_Hvd_1-2_Betaling": f"{pay_hvd_1_2:.2f}",
-            "OT_Hvd_3-4_Timer": f"{breakdown.ot_weekday_hour_3_4:.2f}",
-            "OT_Hvd_3-4_Rate": f"{rates['weekday_hour_3_4']:.2f}",
-            "OT_Hvd_3-4_Betaling": f"{pay_hvd_3_4:.2f}",
-            "OT_Hvd_5+_Timer": f"{breakdown.ot_weekday_hour_5_plus:.2f}",
-            "OT_Hvd_5+_Rate": f"{rates['weekday_hour_5_plus']:.2f}",
-            "OT_Hvd_5+_Betaling": f"{pay_hvd_5_plus:.2f}",
-            # Time-of-day scheduled
-            "OT_Hvd_Dag_Timer": f"{breakdown.ot_weekday_scheduled_day:.2f}",
+            "HalvSygTimer": f"{record.half_sick_hours:.2f}",
+            "OT_Hvd_Dag_Timer": f"{bd.ot_weekday_scheduled_day:.2f}",
             "OT_Hvd_Dag_Rate": f"{rates['weekday_scheduled_day']:.2f}",
             "OT_Hvd_Dag_Betaling": f"{pay_hvd_dag:.2f}",
-            "OT_Hvd_Nat_Timer": f"{breakdown.ot_weekday_scheduled_night:.2f}",
+            "OT_Hvd_Nat_Timer": f"{bd.ot_weekday_scheduled_night:.2f}",
             "OT_Hvd_Nat_Rate": f"{rates['weekday_scheduled_night']:.2f}",
             "OT_Hvd_Nat_Betaling": f"{pay_hvd_nat:.2f}",
-            # Day off
-            "OT_Fridag_Dag_Timer": f"{breakdown.ot_dayoff_day:.2f}",
+            "OT_Fridag_Dag_Timer": f"{bd.ot_dayoff_day:.2f}",
             "OT_Fridag_Dag_Rate": f"{rates['dayoff_day']:.2f}",
             "OT_Fridag_Dag_Betaling": f"{pay_fridag_dag:.2f}",
-            "OT_Fridag_Nat_Timer": f"{breakdown.ot_dayoff_night:.2f}",
+            "OT_Fridag_Nat_Timer": f"{bd.ot_dayoff_night:.2f}",
             "OT_Fridag_Nat_Rate": f"{rates['dayoff_night']:.2f}",
             "OT_Fridag_Nat_Betaling": f"{pay_fridag_nat:.2f}",
-            # Saturday
-            "OT_Lør_Dag_Timer": f"{breakdown.ot_saturday_day:.2f}",
-            "OT_Lør_Dag_Rate": f"{rates['saturday_day']:.2f}",
-            "OT_Lør_Dag_Betaling": f"{pay_lør_dag:.2f}",
-            "OT_Lør_Nat_Timer": f"{breakdown.ot_saturday_night:.2f}",
-            "OT_Lør_Nat_Rate": f"{rates['saturday_night']:.2f}",
-            "OT_Lør_Nat_Betaling": f"{pay_lør_nat:.2f}",
-            # Sunday
-            "OT_Søn_Før12_Timer": f"{breakdown.ot_sunday_before_noon:.2f}",
-            "OT_Søn_Før12_Rate": f"{rates['sunday_before_noon']:.2f}",
-            "OT_Søn_Før12_Betaling": f"{pay_søn_før12:.2f}",
-            "OT_Søn_Efter12_Timer": f"{breakdown.ot_sunday_after_noon:.2f}",
-            "OT_Søn_Efter12_Rate": f"{rates['sunday_after_noon']:.2f}",
-            "OT_Søn_Efter12_Betaling": f"{pay_søn_efter12:.2f}",
-            # Totals
-            "OT_Total_Timer": f"{total_ot_hours:.2f}",
-            "OT_Total_Betaling": f"{total_ot_payment:.2f}",
+            "OT_Weekend_Timer": f"{bd.ot_weekend:.2f}",
+            "OT_Weekend_Rate": f"{rates['weekend']:.2f}",
+            "OT_Weekend_Betaling": f"{pay_weekend:.2f}",
             "CallOutBetaling": f"{record.call_out_payment:.2f}",
-            "Total_Betaling": f"{total_payment:.2f}"
         })
-    
+
     return output.getvalue()
 
 
-def generate_detailed_weekly_summary_csv(summaries: List[WeeklySummary]) -> str:
+def generate_detailed_period_summary_csv(summaries: List[PeriodSummary]) -> str:
     """
-    Generate detailed weekly summary CSV with overtime breakdown (DBR 2026).
-    
-    Args:
-        summaries: List of WeeklySummary objects
-        
-    Returns:
-        CSV content as string with detailed weekly overtime categories
+    Generate detailed period summary CSV with overtime breakdown and rates (DBR 2026).
     """
     output = StringIO()
-    
+
     fieldnames = [
         "Medarbejder",
         "År",
-        "UgeNummer",
-        "TotalTimer",
+        "PeriodeNummer",
+        "PeriodeStart",
+        "PeriodeSlut",
+        "HverdageTimer",
         "NormaleTimer",
-        "OT_Hvd_1-2_Timer",
-        "OT_Hvd_3-4_Timer",
-        "OT_Hvd_5+_Timer",
-        "OT_Lør_Timer",
-        "OT_Søn_Timer",
-        "OT_Total_Timer"
+        "OT1_Timer",
+        "OT1_Rate",
+        "OT1_Betaling",
+        "OT2_Timer",
+        "OT2_Rate",
+        "OT2_Betaling",
+        "OT3_Hvd_Timer",
+        "OT3_Hvd_Rate",
+        "OT3_Hvd_Betaling",
+        "OT_Weekend_Timer",
+        "OT_Weekend_Rate",
+        "OT_Weekend_Betaling",
+        "OT_Fridag_Dag_Timer",
+        "OT_Fridag_Nat_Timer",
+        "OT_Total_Timer",
+        "OT_Total_Betaling",
     ]
-    
+
     writer = csv.DictWriter(output, fieldnames=fieldnames, delimiter=";")
     writer.writeheader()
-    
+
     for summary in summaries:
-        breakdown = summary.overtime_breakdown
-        
-        ot_lør_timer = breakdown.ot_saturday_day + breakdown.ot_saturday_night
-        ot_søn_timer = breakdown.ot_sunday_before_noon + breakdown.ot_sunday_after_noon
-        total_ot = (
-            breakdown.ot_weekday_hour_1_2 + breakdown.ot_weekday_hour_3_4 + 
-            breakdown.ot_weekday_hour_5_plus + ot_lør_timer + ot_søn_timer +
-            breakdown.ot_dayoff_day + breakdown.ot_dayoff_night
+        # Use the start date of the period to pick rates
+        date_obj = datetime.strptime(summary.period_start, "%d-%m-%Y").date()
+        rates = get_overtime_rates(date_obj)
+
+        bd = summary.overtime_breakdown
+
+        pay_ot1 = bd.ot_weekday_hour_1_2 * rates['weekday_hour_1_2']
+        pay_ot2 = bd.ot_weekday_hour_3_4 * rates['weekday_hour_3_4']
+        pay_ot3_hvd = bd.ot_weekday_hour_5_plus * rates['weekday_hour_5_plus']
+        pay_weekend = bd.ot_weekend * rates['weekend']
+        pay_fridag_dag = bd.ot_dayoff_day * rates['dayoff_day']
+        pay_fridag_nat = bd.ot_dayoff_night * rates['dayoff_night']
+
+        total_ot_hours = (
+            bd.ot_weekday_hour_1_2 + bd.ot_weekday_hour_3_4 +
+            bd.ot_weekday_hour_5_plus + bd.ot_weekend +
+            bd.ot_dayoff_day + bd.ot_dayoff_night
         )
-        
+        total_ot_payment = pay_ot1 + pay_ot2 + pay_ot3_hvd + pay_weekend + pay_fridag_dag + pay_fridag_nat
+
         writer.writerow({
             "Medarbejder": summary.worker_name,
             "År": summary.year,
-            "UgeNummer": summary.week_number,
-            "TotalTimer": f"{summary.total_hours:.2f}",
+            "PeriodeNummer": summary.period_number,
+            "PeriodeStart": summary.period_start,
+            "PeriodeSlut": summary.period_end,
+            "HverdageTimer": f"{summary.weekday_hours:.2f}",
             "NormaleTimer": f"{summary.normal_hours:.2f}",
-            "OT_Hvd_1-2_Timer": f"{breakdown.ot_weekday_hour_1_2:.2f}",
-            "OT_Hvd_3-4_Timer": f"{breakdown.ot_weekday_hour_3_4:.2f}",
-            "OT_Hvd_5+_Timer": f"{breakdown.ot_weekday_hour_5_plus:.2f}",
-            "OT_Lør_Timer": f"{ot_lør_timer:.2f}",
-            "OT_Søn_Timer": f"{ot_søn_timer:.2f}",
-            "OT_Total_Timer": f"{total_ot:.2f}"
+            "OT1_Timer": f"{bd.ot_weekday_hour_1_2:.2f}",
+            "OT1_Rate": f"{rates['weekday_hour_1_2']:.2f}",
+            "OT1_Betaling": f"{pay_ot1:.2f}",
+            "OT2_Timer": f"{bd.ot_weekday_hour_3_4:.2f}",
+            "OT2_Rate": f"{rates['weekday_hour_3_4']:.2f}",
+            "OT2_Betaling": f"{pay_ot2:.2f}",
+            "OT3_Hvd_Timer": f"{bd.ot_weekday_hour_5_plus:.2f}",
+            "OT3_Hvd_Rate": f"{rates['weekday_hour_5_plus']:.2f}",
+            "OT3_Hvd_Betaling": f"{pay_ot3_hvd:.2f}",
+            "OT_Weekend_Timer": f"{bd.ot_weekend:.2f}",
+            "OT_Weekend_Rate": f"{rates['weekend']:.2f}",
+            "OT_Weekend_Betaling": f"{pay_weekend:.2f}",
+            "OT_Fridag_Dag_Timer": f"{bd.ot_dayoff_day:.2f}",
+            "OT_Fridag_Nat_Timer": f"{bd.ot_dayoff_night:.2f}",
+            "OT_Total_Timer": f"{total_ot_hours:.2f}",
+            "OT_Total_Betaling": f"{total_ot_payment:.2f}",
         })
-    
+
     return output.getvalue()

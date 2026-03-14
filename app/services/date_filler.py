@@ -78,9 +78,11 @@ def fill_missing_dates(outputs: List[DailyOutput]) -> List[DailyOutput]:
                     else:
                         day_type = 'Weekday'
                     
-                    # Get week number
+                    # Get week number and period number
                     week_number = current_date.isocalendar()[1]
-                    
+                    from app.services.overtime_calculator import get_period_number
+                    period_number = get_period_number(week_number)
+
                     # Create empty DailyOutput
                     empty_output = DailyOutput(
                         worker=worker_name,
@@ -91,16 +93,13 @@ def fill_missing_dates(outputs: List[DailyOutput]) -> List[DailyOutput]:
                         hours_norm_time=0.0,
                         hours_outside_norm=0.0,
                         week_number=week_number,
-                        weekly_total=0.0,
+                        period_number=period_number,
                         normal_hours=0.0,
                         overtime_breakdown=OvertimeBreakdown(),
-                        overtime_1=0.0,
-                        overtime_2=0.0,
-                        overtime_3=0.0,
                         has_call_out_qualifying_time=False,
                         call_out_payment=0.0,
                         call_out_applied=False,
-                        entries=[]
+                        entries=[],
                     )
                     filled_outputs.append(empty_output)
             

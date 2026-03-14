@@ -61,41 +61,41 @@ class OvertimeBreakdown(BaseModel):
     ot_weekday_hour_1_2: float = 0.0
     ot_weekday_hour_3_4: float = 0.0
     ot_weekday_hour_5_plus: float = 0.0
-    
-    # Time-of-day scheduled work
+
+    # Time-of-day scheduled work (weekdays)
     ot_weekday_scheduled_day: float = 0.0  # 06:00-18:00
     ot_weekday_scheduled_night: float = 0.0  # 18:00-06:00
-    
+
     # Day off (vacation/scheduled off)
     ot_dayoff_day: float = 0.0  # 06:00-18:00
     ot_dayoff_night: float = 0.0  # 18:00-06:00
-    
-    # Weekend/holiday
-    ot_saturday_day: float = 0.0  # 06:00-18:00
-    ot_saturday_night: float = 0.0  # 18:00-06:00
-    ot_sunday_before_noon: float = 0.0  # Before 12:00
-    ot_sunday_after_noon: float = 0.0  # After 12:00
+
+    # Weekend (Saturday + Sunday combined, flat OT3 rate)
+    ot_weekend: float = 0.0
 
 
-class WeeklySummary(BaseModel):
-    """Summary of a worker's week with overtime calculations"""
+class PeriodSummary(BaseModel):
+    """Summary of a worker's 14-day period with overtime calculations"""
     worker_name: str
-    week_number: int
+    period_number: int   # 0-based index within the year: floor((week - 1) / 2)
+    period_start: str    # DD-MM-YYYY of Monday starting the period
+    period_end: str      # DD-MM-YYYY of Sunday ending the period
     year: int
     total_hours: float = 0.0
-    normal_hours: float = 0.0
-    
-    # New detailed overtime breakdown
+    weekday_hours: float = 0.0   # Weekday-only hours (used for norm comparison)
+    normal_hours: float = 0.0    # Min(weekday_hours, 74)
+
+    # Detailed overtime breakdown
     overtime_breakdown: OvertimeBreakdown = OvertimeBreakdown()
-    
-    # Legacy fields for backward compatibility
+
+    # Top-level OT values (kept for easy access)
     overtime_1: float = 0.0
     overtime_2: float = 0.0
     overtime_3: float = 0.0
 
 
 class DailyOutput(BaseModel):
-    """Output row for the final CSV"""
+    """Output row for the final CSV / preview"""
     worker: str
     date: str
     day: str
@@ -104,17 +104,16 @@ class DailyOutput(BaseModel):
     hours_norm_time: float
     hours_outside_norm: float
     week_number: int
-    weekly_total: float
+    period_number: int   # 14-day period index
     normal_hours: float
-    
-    # New detailed overtime breakdown
+
+    # Detailed overtime breakdown (weekend hours are meaningful per-day;
+    # weekday OT tiers only accumulate at period level)
     overtime_breakdown: OvertimeBreakdown = OvertimeBreakdown()
-    
-    # Legacy fields for backward compatibility
-    overtime_1: float
-    overtime_2: float
-    overtime_3: float
-    
+
+    # Half sick day top-up hours applied to this day
+    half_sick_hours: float = 0.0
+
     has_call_out_qualifying_time: bool = False
     call_out_payment: float = 0.0
     call_out_applied: bool = False

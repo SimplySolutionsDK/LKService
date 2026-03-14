@@ -37,11 +37,7 @@ export const DailyTable: React.FC<DailyTableProps> = ({
             <th className={TH}>Type</th>
             <th className={TH}>Total</th>
             <th className={TH}>Normal</th>
-            <th className={TH} title="Hverdage: 1. & 2. overtidstime (48,10 kr)">OT Hvd 1-2</th>
-            <th className={TH} title="Hverdage: 3. & 4. overtidstime (76,80 kr)">OT Hvd 3-4</th>
-            <th className={TH} title="Hverdage: 5.+ overtidstime (143,70 kr)">OT Hvd 5+</th>
-            <th className={TH} title="Lørdag timer (dag: 76,80 kr, nat: 143,70 kr)">OT Lør</th>
-            <th className={TH} title="Søndag timer (før 12: 95,75 kr, efter 12: 143,70 kr)">OT Søn</th>
+            <th className={TH} title="Weekend timer (lørdag + søndag) — OT3 sats (143,70 kr)">OT Weekend</th>
             <th className={TH} title="Call Out betaling (750 kr) for vagter der starter før 07:00 eller efter 15:30">Call Out / Fravær</th>
             <th className={TH}>Detaljer</th>
           </tr>
@@ -49,13 +45,11 @@ export const DailyTable: React.FC<DailyTableProps> = ({
         <tbody>
           {data.map((row, index) => {
             const otb = row.overtime_breakdown;
-            const ot_lor_total = otb.ot_saturday_day + otb.ot_saturday_night;
-            const ot_son_total = otb.ot_sunday_before_noon + otb.ot_sunday_after_noon;
-            
             const isEmpty = row.entries.length === 0;
             const isEligible = row.has_call_out_qualifying_time;
             const isChecked = callOutSelections[row.date] || false;
             const currentAbsence = absenceSelections[row.date] || 'None';
+            const hasHalfSick = (row.half_sick_hours ?? 0) > 0;
 
             /* Determine row background — most specific wins */
             let rowBg = '';
@@ -65,7 +59,8 @@ export const DailyTable: React.FC<DailyTableProps> = ({
               else if (currentAbsence === 'Kursus') rowBg = 'bg-emerald-500/15';
               else rowBg = 'bg-slate-400/5';
             } else {
-              if (row.day_type === 'Sunday') rowBg = 'bg-red-500/10';
+              if (hasHalfSick) rowBg = 'bg-blue-500/[0.07]';
+              else if (row.day_type === 'Sunday') rowBg = 'bg-red-500/10';
               else if (row.day_type === 'Saturday') rowBg = 'bg-orange-500/[0.08]';
             }
 
@@ -77,24 +72,20 @@ export const DailyTable: React.FC<DailyTableProps> = ({
                 <td className={TD}>{row.day_type}</td>
                 <td className={clsx(TD_NUM, isEmpty && 'text-slate-400 opacity-70')}>
                   {row.total_hours.toFixed(2)}
+                  {hasHalfSick && (
+                    <span
+                      className="ml-1 text-blue-400 text-[0.75rem]"
+                      title={`Halv sygedag: +${(row.half_sick_hours ?? 0).toFixed(2)}t`}
+                    >
+                      (+{(row.half_sick_hours ?? 0).toFixed(2)})
+                    </span>
+                  )}
                 </td>
                 <td className={clsx(TD_NUM, isEmpty && 'text-slate-400 opacity-70')}>
                   {row.normal_hours.toFixed(2)}
                 </td>
-                <td className={clsx(TD_NUM, otb.ot_weekday_hour_1_2 > 0 && 'text-ot1 font-medium')}>
-                  {otb.ot_weekday_hour_1_2.toFixed(2)}
-                </td>
-                <td className={clsx(TD_NUM, otb.ot_weekday_hour_3_4 > 0 && 'text-ot2 font-medium')}>
-                  {otb.ot_weekday_hour_3_4.toFixed(2)}
-                </td>
-                <td className={clsx(TD_NUM, otb.ot_weekday_hour_5_plus > 0 && 'text-ot3 font-medium')}>
-                  {otb.ot_weekday_hour_5_plus.toFixed(2)}
-                </td>
-                <td className={clsx(TD_NUM, ot_lor_total > 0 && 'text-ot2 font-medium')}>
-                  {ot_lor_total.toFixed(2)}
-                </td>
-                <td className={clsx(TD_NUM, ot_son_total > 0 && 'text-ot3 font-medium')}>
-                  {ot_son_total.toFixed(2)}
+                <td className={clsx(TD_NUM, otb.ot_weekend > 0 && 'text-ot3 font-medium')}>
+                  {otb.ot_weekend.toFixed(2)}
                 </td>
                 <td className={`${TD} text-center`}>
                   {isEmpty ? (

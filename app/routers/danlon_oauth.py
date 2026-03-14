@@ -956,10 +956,7 @@ def _sum_overtime(breakdown: Dict[str, Any]) -> float:
             "ot_weekday_scheduled_night",
             "ot_dayoff_day",
             "ot_dayoff_night",
-            "ot_saturday_day",
-            "ot_saturday_night",
-            "ot_sunday_before_noon",
-            "ot_sunday_after_noon",
+            "ot_weekend",
         )
     )
 

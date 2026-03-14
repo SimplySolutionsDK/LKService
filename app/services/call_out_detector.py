@@ -118,8 +118,8 @@ def apply_call_out_payment(
                 
                 # Recalculate overtime with call-out rules if we have the record
                 if date_key in records_by_date:
-                    from app.services.overtime_calculator import recalculate_overtime_with_callout
-                    output = recalculate_overtime_with_callout(output, records_by_date[date_key])
+                    from app.services.overtime_calculator import recalculate_with_callout
+                    output = recalculate_with_callout(output, records_by_date[date_key])
             else:
                 # Reset if somehow selected but doesn't qualify
                 output.call_out_payment = 0.0

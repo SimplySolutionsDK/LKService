@@ -1,14 +1,15 @@
 import { useState, useCallback } from 'react';
-import type { 
-  PreviewData, 
-  TabType, 
-  OutputFormat, 
-  CallOutSelections, 
+import type {
+  PreviewData,
+  TabType,
+  OutputFormat,
+  CallOutSelections,
   AbsenceSelections,
   AbsenceType,
-  StatusMessage, 
+  OvertimeOverrides,
+  StatusMessage,
   EmployeeType,
-  ApiFetchParams
+  ApiFetchParams,
 } from '../types';
 import { api } from '../services/api';
 
@@ -18,8 +19,10 @@ export const usePreview = () => {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('daily');
   const [callOutSelections, setCallOutSelections] = useState<CallOutSelections>({});
   const [absenceSelections, setAbsenceSelections] = useState<AbsenceSelections>({});
+  const [overtimeOverrides, setOvertimeOverrides] = useState<OvertimeOverrides>({});
   const [status, setStatus] = useState<StatusMessage | undefined>();
   const [isLoading, setIsLoading] = useState(false);
+  const [isHalfSickLoading, setIsHalfSickLoading] = useState(false);
 
   const loadPreview = useCallback(async (files: File[], employeeType: EmployeeType) => {
     setIsLoading(true);
@@ -30,12 +33,12 @@ export const usePreview = () => {
       setPreviewData(data);
       setCallOutSelections({});
       setAbsenceSelections({});
+      setOvertimeOverrides({});
       setStatus({
         type: 'success',
         message: `✓ ${data.total_records} registreringer behandlet fra ${files.length} fil(er)`,
       });
-      
-      // Scroll to preview after a short delay
+
       setTimeout(() => {
         const previewCard = document.querySelector('.preview-card');
         if (previewCard) {
@@ -59,6 +62,11 @@ export const usePreview = () => {
     }
 
     try {
+      // Save overtime overrides to backend before exporting
+      if (Object.keys(overtimeOverrides).length > 0) {
+        await api.saveOvertimeOverrides(previewData.session_id, overtimeOverrides);
+      }
+
       const response = await fetch(`/api/export/${previewData.session_id}`, {
         method: 'POST',
         body: (() => {
@@ -73,7 +81,6 @@ export const usePreview = () => {
         const blob = await response.blob();
         const filename = api.getFilename(response);
 
-        // Trigger download
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -94,7 +101,7 @@ export const usePreview = () => {
         message: `✕ Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`,
       });
     }
-  }, [previewData, outputFormat, callOutSelections]);
+  }, [previewData, outputFormat, callOutSelections, overtimeOverrides]);
 
   const updateCallOutSelection = useCallback((date: string, checked: boolean) => {
     setCallOutSelections(prev => ({ ...prev, [date]: checked }));
@@ -103,8 +110,7 @@ export const usePreview = () => {
   const updateAbsenceSelection = useCallback(async (date: string, absenceType: AbsenceType) => {
     const newSelections = { ...absenceSelections, [date]: absenceType };
     setAbsenceSelections(newSelections);
-    
-    // Call backend to recalculate hours
+
     if (previewData?.session_id) {
       try {
         const updatedData = await api.markAbsence(previewData.session_id, newSelections);
@@ -118,6 +124,37 @@ export const usePreview = () => {
     }
   }, [absenceSelections, previewData]);
 
+  const applyHalfSickDay = useCallback(async (date: string) => {
+    if (!previewData?.session_id) return;
+
+    setIsHalfSickLoading(true);
+    try {
+      const updatedData = await api.markHalfSickDay(previewData.session_id, date);
+      setPreviewData(updatedData);
+      setStatus({ type: 'success', message: `✓ Halv sygedag tilføjet for ${date}` });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: `✕ Fejl ved halv sygedag: ${error instanceof Error ? error.message : 'Ukendt fejl'}`,
+      });
+    } finally {
+      setIsHalfSickLoading(false);
+    }
+  }, [previewData]);
+
+  const updateOvertimeOverride = useCallback(
+    (periodKey: string, field: string, value: number) => {
+      setOvertimeOverrides(prev => ({
+        ...prev,
+        [periodKey]: {
+          ...prev[periodKey],
+          [field]: value,
+        },
+      }));
+    },
+    []
+  );
+
   const loadPreviewFromApi = useCallback(async (params: ApiFetchParams, employeeType: EmployeeType) => {
     setIsLoading(true);
     setStatus({ type: 'loading', message: 'Henter data fra API...' });
@@ -127,12 +164,12 @@ export const usePreview = () => {
       setPreviewData(data);
       setCallOutSelections({});
       setAbsenceSelections({});
+      setOvertimeOverrides({});
       setStatus({
         type: 'success',
         message: `✓ ${data.total_records} registreringer hentet for ${params.employeeName}`,
       });
-      
-      // Scroll to preview after a short delay
+
       setTimeout(() => {
         const previewCard = document.querySelector('.preview-card');
         if (previewCard) {
@@ -153,6 +190,7 @@ export const usePreview = () => {
     setPreviewData(null);
     setCallOutSelections({});
     setAbsenceSelections({});
+    setOvertimeOverrides({});
     setStatus(undefined);
   }, []);
 
@@ -162,8 +200,10 @@ export const usePreview = () => {
     outputFormat,
     callOutSelections,
     absenceSelections,
+    overtimeOverrides,
     status,
     isLoading,
+    isHalfSickLoading,
     setActiveTab,
     setOutputFormat,
     loadPreview,
@@ -171,6 +211,8 @@ export const usePreview = () => {
     exportData,
     updateCallOutSelection,
     updateAbsenceSelection,
+    applyHalfSickDay,
+    updateOvertimeOverride,
     clearPreview,
   };
 };

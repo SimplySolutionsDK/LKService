@@ -212,10 +212,10 @@ async def fetch_from_external_api(
                 "success": True,
                 "session_id": session_id,
                 "daily": [],
-                "weekly": [],
+                "periods": [],
                 "call_out_eligible_days": {},
                 "total_records": 0,
-                "total_weeks": 0
+                "total_periods": 0,
             })
         
         # Transform to DailyRecord format
@@ -242,40 +242,20 @@ async def fetch_from_external_api(
         # Generate session ID for caching
         session_id = str(uuid.uuid4())
         
-        # Convert to dictionaries for JSON response
-        daily_data = []
-        for output in outputs:
-            output_dict = output.model_dump()
-            # Convert time objects to strings in entries
-            for entry in output_dict.get('entries', []):
-                if 'start_time' in entry and entry['start_time']:
-                    entry['start_time'] = entry['start_time'].strftime('%H:%M') if hasattr(entry['start_time'], 'strftime') else str(entry['start_time'])
-                if 'end_time' in entry and entry['end_time']:
-                    entry['end_time'] = entry['end_time'].strftime('%H:%M') if hasattr(entry['end_time'], 'strftime') else str(entry['end_time'])
-            daily_data.append(output_dict)
-        
-        weekly_data = [summary.model_dump() for summary in summaries]
-        
         # Cache the processed data (reusing the existing preview_cache from upload.py)
-        # We'll need to import this or use a shared cache
-        from app.routers.upload import preview_cache
+        from app.routers.upload import preview_cache, _build_preview_response
         preview_cache[session_id] = {
-            "records": all_records,  # Store original DailyRecords for re-processing
+            "records": all_records,
             "outputs": outputs,
             "summaries": summaries,
             "call_out_eligible_days": call_out_eligible_days,
-            "timestamp": datetime.now()
+            "overtime_overrides": {},
+            "timestamp": datetime.now(),
         }
-        
-        return JSONResponse(content={
-            "success": True,
-            "session_id": session_id,
-            "daily": daily_data,
-            "weekly": weekly_data,
-            "call_out_eligible_days": call_out_eligible_days,
-            "total_records": len(outputs),
-            "total_weeks": len(summaries)
-        })
+
+        return JSONResponse(content=_build_preview_response(
+            session_id, outputs, summaries, call_out_eligible_days
+        ))
         
     except httpx.HTTPError as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch time registrations: {str(e)}")
