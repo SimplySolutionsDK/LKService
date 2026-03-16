@@ -30,15 +30,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
 
+_db_ready = False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events."""
-    # Startup
+    global _db_ready
     logger.info("Initializing database...")
-    await init_db()
-    logger.info("Database initialized successfully")
+    try:
+        await init_db()
+        _db_ready = True
+        logger.info("Database initialized successfully")
+    except Exception as exc:
+        logger.error("Database initialization failed: %s", exc)
     yield
-    # Shutdown
     logger.info("Closing database connections...")
     await close_db()
     logger.info("Database connections closed")
@@ -58,6 +64,13 @@ app.include_router(danlon_oauth.router)
 app.include_router(danlon_integration_example.router)
 app.include_router(danlon_test.router)
 
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "Time Registration CSV Parser", "db_ready": _db_ready}
+
+
 # Mount static files from the built frontend (only if dist exists)
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
@@ -74,12 +87,6 @@ else:
             "message": "Frontend not built yet. Run 'cd frontend && npm run build' to build the frontend.",
             "dev_server": "For development, run 'cd frontend && npm run dev' in a separate terminal."
         }
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "Time Registration CSV Parser"}
 
 
 if __name__ == "__main__":
