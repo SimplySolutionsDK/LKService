@@ -1,10 +1,9 @@
 """
 Database configuration and session management.
-Uses SQLite for local development and Railway deployment.
+Uses SQLite locally and async PostgreSQL on Railway.
 """
-from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import StaticPool
 import os
 from pathlib import Path
@@ -19,11 +18,18 @@ DATABASE_URL = os.getenv(
 BASE_DIR = Path(__file__).resolve().parent.parent
 db_path = BASE_DIR / "lkservice.db"
 
-# For Railway, they might provide a postgres URL
-# If so, we'll use it, otherwise use SQLite
-if DATABASE_URL.startswith("postgres://"):
-    # Railway uses postgres:// but SQLAlchemy needs postgresql://
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+def _normalize_database_url(database_url: str) -> str:
+    """Ensure Postgres URLs use SQLAlchemy's asyncpg driver."""
+    if database_url.startswith("postgresql+asyncpg://"):
+        return database_url
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return database_url
+
+
+DATABASE_URL = _normalize_database_url(DATABASE_URL)
 
 # Create async engine
 engine = create_async_engine(
