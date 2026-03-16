@@ -9,7 +9,6 @@ interface HeaderProps {
   employeeType: EmployeeType;
   onEmployeeTypeChange: (type: EmployeeType) => void;
   danlonCompanyId?: string;
-  onDanlonConnectionChange?: () => void;
 }
 
 const employeeTypeOptions = [
@@ -23,7 +22,6 @@ export const Header: React.FC<HeaderProps> = ({
   employeeType,
   onEmployeeTypeChange,
   danlonCompanyId,
-  onDanlonConnectionChange,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'danlon'>('general');

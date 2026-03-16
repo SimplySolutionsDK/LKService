@@ -112,7 +112,6 @@ function App() {
         employeeType={employeeType}
         onEmployeeTypeChange={setEmployeeType}
         danlonCompanyId={danlonCompanyId}
-        onDanlonConnectionChange={handleDanlonConnectionChange}
       />
 
       <div className="flex flex-col gap-6">
