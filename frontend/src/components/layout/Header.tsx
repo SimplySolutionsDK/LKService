@@ -28,12 +28,6 @@ export const Header: React.FC<HeaderProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'danlon'>('general');
 
-  const handleDanlonSync = () => {
-    if (onDanlonConnectionChange) {
-      onDanlonConnectionChange();
-    }
-  };
-
   return (
     <header className="text-center mb-10 relative max-md:mb-6">
       <div className="relative flex items-start justify-center mb-4 max-md:justify-between max-md:w-full">
