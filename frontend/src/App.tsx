@@ -32,7 +32,7 @@ function App() {
     outputFormat,
     callOutSelections,
     absenceSelections,
-    overtimeOverrides,
+    statsOverrides,
     status,
     isLoading,
     isHalfSickLoading,
@@ -44,7 +44,8 @@ function App() {
     updateCallOutSelection,
     updateAbsenceSelection,
     applyHalfSickDay,
-    updateOvertimeOverride,
+    updateStatsOverride,
+    resetStatsOverride,
     clearPreview,
   } = usePreview();
 
@@ -186,12 +187,13 @@ function App() {
             outputFormat={outputFormat}
             callOutSelections={callOutSelections}
             absenceSelections={absenceSelections}
-            overtimeOverrides={overtimeOverrides}
+            statsOverrides={statsOverrides}
             onTabChange={setActiveTab}
             onFormatChange={setOutputFormat}
             onCallOutChange={updateCallOutSelection}
             onAbsenceChange={updateAbsenceSelection}
-            onOvertimeOverride={updateOvertimeOverride}
+            onStatsOverride={updateStatsOverride}
+            onStatsReset={resetStatsOverride}
             onShowDetails={handleShowDetails}
             onHalfSickDayOpen={() => setIsHalfSickModalOpen(true)}
             onExport={exportData}

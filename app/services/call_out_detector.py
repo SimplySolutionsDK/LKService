@@ -1,7 +1,7 @@
-from datetime import time
-from typing import Dict
+from datetime import date, datetime, time
+from typing import Dict, List
 
-from app.models.schemas import DailyRecord, DailyOutput
+from app.models.schemas import DailyRecord, DailyOutput, TimeEntry
 
 
 # Call out payment amount
@@ -11,54 +11,63 @@ CALL_OUT_PAYMENT_AMOUNT = 750.0
 CALL_OUT_MORNING_END = time(7, 0)  # Before 07:00
 CALL_OUT_EVENING_START = time(15, 30)  # After or at 15:30
 
-# Call out continuation check (for entries starting at 16:00+)
-CALL_OUT_CONTINUATION_START = time(16, 0)  # Entries at/after 16:00 need continuation check
-CALL_OUT_CONTINUATION_WINDOW_MINUTES = 30  # 30 minutes before 16:00 = 15:30
+# Continuation: if gap between previous end and current start is <= this, not a call-out
+CALL_OUT_MAX_CONTINUATION_GAP_MINUTES = 15
+
+# Dummy date for time arithmetic (same-day entries only)
+_DUMMY_DATE = date(2000, 1, 1)
+
+
+def _gap_minutes(prev_end: time, curr_start: time) -> float:
+    """Return minutes between prev_end and curr_start (same day). curr_start >= prev_end assumed."""
+    end_dt = datetime.combine(_DUMMY_DATE, prev_end)
+    start_dt = datetime.combine(_DUMMY_DATE, curr_start)
+    return (start_dt - end_dt).total_seconds() / 60.0
+
+
+def _is_continuation(entry: TimeEntry, sorted_entries: List[TimeEntry], i: int) -> bool:
+    """
+    True if this entry is a continuation of prior work (gap from previous end to this start <= 15 min).
+    """
+    start = entry.start_time
+    # Immediately preceding: largest end_time among previous entries with end_time <= start
+    candidates = [sorted_entries[j] for j in range(i) if sorted_entries[j].end_time <= start]
+    if not candidates:
+        return False
+    latest_end = max(candidates, key=lambda e: e.end_time).end_time
+    gap = _gap_minutes(latest_end, start)
+    return gap <= CALL_OUT_MAX_CONTINUATION_GAP_MINUTES
 
 
 def detect_call_out_eligibility(record: DailyRecord) -> bool:
     """
     Detect if a daily record qualifies for call out payment.
-    
+
     A day qualifies if ANY time entry starts before 07:00 or at/after 15:30,
-    with the exception that entries starting at 16:00+ are NOT call-outs if 
-    a previous entry ended within 30 minutes of 16:00 (i.e., at or after 15:30).
-    
+    and is NOT a continuation of prior work. An entry is continuation (not call-out)
+    when the gap between the previous assignment's end and this entry's start is
+    <= 15 minutes.
+
     Args:
         record: DailyRecord to check for call out eligibility
-        
+
     Returns:
         True if the day qualifies for call out payment, False otherwise
     """
-    # Sort entries by start time for reliable precedence checking
     sorted_entries = sorted(record.entries, key=lambda e: e.start_time)
-    
+
     for i, entry in enumerate(sorted_entries):
         start = entry.start_time
-        
-        # Check if start time is before 07:00 (morning call-out, no continuation check)
+
         if start < CALL_OUT_MORNING_END:
-            return True
-        
-        # Check if start time is at or after 15:30
+            if not _is_continuation(entry, sorted_entries, i):
+                return True
+            continue
+
         if start >= CALL_OUT_EVENING_START:
-            # For entries starting at 16:00+, check for continuation
-            if start >= CALL_OUT_CONTINUATION_START:
-                # Check if any previous entry ended at or after 15:30
-                has_recent_work = False
-                for j in range(i):
-                    prev_entry = sorted_entries[j]
-                    if prev_entry.end_time >= CALL_OUT_EVENING_START:
-                        has_recent_work = True
-                        break
-                
-                # If there was recent work (ending at/after 15:30), this is continuation, not a call-out
-                if has_recent_work:
-                    continue
-            
-            # If we reach here, it's a call-out
-            return True
-    
+            if not _is_continuation(entry, sorted_entries, i):
+                return True
+
     return False
 
 
@@ -135,107 +144,73 @@ def apply_call_out_payment(
 def get_call_out_qualifying_entries(record: DailyRecord) -> list[int]:
     """
     Get indices of time entries that qualify for call-out on a given day.
-    
-    An entry qualifies if it starts before 07:00 or at/after 15:30,
-    with the exception that entries starting at 16:00+ are NOT call-outs if 
-    a previous entry ended within 30 minutes of 16:00 (i.e., at or after 15:30).
-    
+
+    An entry qualifies if it starts before 07:00 or at/after 15:30 and is NOT
+    a continuation of prior work (gap between previous end and this start > 15 min).
+
     Args:
         record: DailyRecord to check for call out qualifying entries
-        
+
     Returns:
         List of indices of qualifying entries in the record.entries list
     """
-    # Sort entries by start time for reliable precedence checking
     sorted_entries = sorted(record.entries, key=lambda e: e.start_time)
-    
-    # Map sorted entries back to original indices
+
     entry_to_index = {}
     for original_idx, entry in enumerate(record.entries):
         entry_to_index[id(entry)] = original_idx
-    
+
     qualifying_indices = []
-    
+
     for i, entry in enumerate(sorted_entries):
         start = entry.start_time
-        
-        # Check if start time is before 07:00 (morning call-out, no continuation check)
+
         if start < CALL_OUT_MORNING_END:
-            qualifying_indices.append(entry_to_index[id(entry)])
+            if not _is_continuation(entry, sorted_entries, i):
+                qualifying_indices.append(entry_to_index[id(entry)])
             continue
-        
-        # Check if start time is at or after 15:30
+
         if start >= CALL_OUT_EVENING_START:
-            # For entries starting at 16:00+, check for continuation
-            if start >= CALL_OUT_CONTINUATION_START:
-                # Check if any previous entry ended at or after 15:30
-                has_recent_work = False
-                for j in range(i):
-                    prev_entry = sorted_entries[j]
-                    if prev_entry.end_time >= CALL_OUT_EVENING_START:
-                        has_recent_work = True
-                        break
-                
-                # If there was recent work (ending at/after 15:30), this is continuation, not a call-out
-                if has_recent_work:
-                    continue
-            
-            # If we reach here, it's a call-out
-            qualifying_indices.append(entry_to_index[id(entry)])
-    
+            if not _is_continuation(entry, sorted_entries, i):
+                qualifying_indices.append(entry_to_index[id(entry)])
+
     return qualifying_indices
 
 
 def get_call_out_eligible_days(records: list[DailyRecord]) -> list[dict]:
     """
     Get a list of days that qualify for call out payment with details.
-    
+    Uses the same continuation rule: no call-out when gap from previous end
+    to this start is <= 15 minutes.
+
     Args:
         records: List of DailyRecord objects
-        
+
     Returns:
         List of dictionaries with date, worker, and qualifying times
     """
     eligible_days = []
-    
+
     for record in records:
         if record.has_call_out_qualifying_time:
-            # Sort entries by start time for consistent logic
             sorted_entries = sorted(record.entries, key=lambda e: e.start_time)
-            
-            # Collect qualifying time entries using the same continuation logic
             qualifying_times = []
+
             for i, entry in enumerate(sorted_entries):
                 start = entry.start_time
-                
-                # Morning call-out (before 07:00)
+
                 if start < CALL_OUT_MORNING_END:
-                    qualifying_times.append(start.strftime("%H:%M"))
-                # Evening call-out (at/after 15:30)
+                    if not _is_continuation(entry, sorted_entries, i):
+                        qualifying_times.append(start.strftime("%H:%M"))
                 elif start >= CALL_OUT_EVENING_START:
-                    # For entries starting at 16:00+, check for continuation
-                    if start >= CALL_OUT_CONTINUATION_START:
-                        # Check if any previous entry ended at or after 15:30
-                        has_recent_work = False
-                        for j in range(i):
-                            prev_entry = sorted_entries[j]
-                            if prev_entry.end_time >= CALL_OUT_EVENING_START:
-                                has_recent_work = True
-                                break
-                        
-                        # Skip if continuation of work
-                        if has_recent_work:
-                            continue
-                    
-                    # This entry qualifies
-                    qualifying_times.append(start.strftime("%H:%M"))
-            
-            # Only add to eligible_days if there are actual qualifying times
+                    if not _is_continuation(entry, sorted_entries, i):
+                        qualifying_times.append(start.strftime("%H:%M"))
+
             if qualifying_times:
                 eligible_days.append({
                     "date": record.date.strftime("%d-%m-%Y"),
                     "worker": record.worker_name,
                     "qualifying_times": qualifying_times
                 })
-    
+
     return eligible_days

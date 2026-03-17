@@ -4,7 +4,7 @@ import type {
   OutputFormat,
   CallOutSelections,
   AbsenceSelections,
-  OvertimeOverrides,
+  StatsOverrides,
   EmployeeSearchResponse,
   ApiFetchParams,
 } from '../types';
@@ -84,7 +84,7 @@ export const api = {
     return response.json();
   },
 
-  async saveOvertimeOverrides(sessionId: string, overrides: OvertimeOverrides): Promise<void> {
+  async saveOvertimeOverrides(sessionId: string, overrides: Record<string, unknown>): Promise<void> {
     const formData = new FormData();
     formData.append('overrides', JSON.stringify(overrides));
 
@@ -96,6 +96,21 @@ export const api = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to save overtime overrides');
+    }
+  },
+
+  async saveStatsOverrides(sessionId: string, overrides: StatsOverrides): Promise<void> {
+    const formData = new FormData();
+    formData.append('overrides', JSON.stringify(overrides));
+
+    const response = await fetch(`/api/stats-overrides/${sessionId}`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to save stats overrides');
     }
   },
 

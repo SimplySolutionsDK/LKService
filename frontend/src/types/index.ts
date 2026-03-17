@@ -84,6 +84,15 @@ export type OvertimeOverrides = {
   };
 };
 
+// Aggregate stats-level overrides (applied across all periods at export)
+export type StatsOverrides = {
+  ot1?: number;
+  ot2?: number;
+  ot3?: number;
+  ot_weekend?: number;
+  normal_hours?: number;
+};
+
 export interface StatusMessage {
   type: 'success' | 'error' | 'loading';
   message: string;

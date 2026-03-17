@@ -200,6 +200,11 @@ async def export_from_preview(
     if overrides:
         summaries = _apply_overtime_overrides_to_summaries(summaries, overrides)
 
+    # Apply aggregate stats overrides before export
+    stats_overrides = cached.get("stats_overrides", {})
+    if stats_overrides:
+        summaries = _apply_stats_overrides_to_summaries(summaries, stats_overrides)
+
     outputs = apply_call_out_payment(outputs, call_out_dict, records)
 
     if output_format == "period":
@@ -396,6 +401,36 @@ async def save_overtime_overrides(
     return JSONResponse(content={"success": True})
 
 
+@router.post("/stats-overrides/{session_id}")
+async def save_stats_overrides(
+    session_id: str,
+    overrides: str = Form(default="{}"),
+):
+    """
+    Store user-supplied aggregate stats override values.
+
+    These are applied at export time so the user can correct calculated totals
+    before sending downstream. The override is distributed across periods so the
+    exported totals match the user-supplied values.
+
+    Args:
+        session_id: Session ID from preview
+        overrides: JSON string with optional keys: ot1, ot2, ot3, ot_weekend, normal_hours
+            Format: { "ot1": 4.0, "ot3": 2.5 }
+    """
+    if session_id not in preview_cache:
+        raise HTTPException(status_code=404, detail="Preview session not found.")
+
+    try:
+        overrides_dict = json.loads(overrides)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid overrides format")
+
+    preview_cache[session_id]["stats_overrides"] = overrides_dict
+
+    return JSONResponse(content={"success": True})
+
+
 @router.post("/process")
 async def process_and_download(
     files: List[UploadFile] = File(...),
@@ -495,3 +530,79 @@ def _apply_overtime_overrides_to_summaries(
                 summary.overtime_breakdown.ot_weekend = float(ov["ot_weekend"])
         result.append(summary)
     return result
+
+
+def _apply_stats_overrides_to_summaries(
+    summaries: list,
+    stats_overrides: dict,
+) -> list:
+    """
+    Apply user-supplied aggregate stats overrides to period summaries before export.
+
+    The override values replace the totals across all periods. The delta between the
+    overridden total and the calculated total is applied to the first period that has
+    a non-zero value in the relevant field.
+
+    Supported keys: ot1, ot2, ot3, ot_weekend, normal_hours
+    """
+    if not summaries:
+        return summaries
+
+    def _calc_total(field: str) -> float:
+        total = 0.0
+        for s in summaries:
+            if field == "ot1":
+                total += s.overtime_breakdown.ot_weekday_hour_1_2
+            elif field == "ot2":
+                total += s.overtime_breakdown.ot_weekday_hour_3_4
+            elif field == "ot3":
+                total += (
+                    s.overtime_breakdown.ot_weekday_hour_5_plus
+                    + s.overtime_breakdown.ot_dayoff_day
+                    + s.overtime_breakdown.ot_dayoff_night
+                )
+            elif field == "ot_weekend":
+                total += s.overtime_breakdown.ot_weekend
+            elif field == "normal_hours":
+                total += s.normal_hours
+        return total
+
+    field_map = {
+        "ot1": ("overtime_1", None),
+        "ot2": ("overtime_2", None),
+        "ot3": ("overtime_3", None),
+        "ot_weekend": (None, "ot_weekend"),
+        "normal_hours": ("normal_hours", None),
+    }
+
+    for override_key, (summary_attr, breakdown_attr) in field_map.items():
+        if override_key not in stats_overrides:
+            continue
+
+        target_total = float(stats_overrides[override_key])
+        current_total = _calc_total(override_key)
+        delta = target_total - current_total
+
+        if abs(delta) < 1e-9:
+            continue
+
+        # Apply delta to the first period with a non-zero value, or the first period if all zero
+        target_summary = None
+        for s in summaries:
+            if summary_attr and getattr(s, summary_attr, 0) > 0:
+                target_summary = s
+                break
+            if breakdown_attr and getattr(s.overtime_breakdown, breakdown_attr, 0) > 0:
+                target_summary = s
+                break
+        if target_summary is None:
+            target_summary = summaries[0]
+
+        if summary_attr:
+            current_val = getattr(target_summary, summary_attr, 0.0)
+            setattr(target_summary, summary_attr, max(0.0, current_val + delta))
+        if breakdown_attr:
+            current_val = getattr(target_summary.overtime_breakdown, breakdown_attr, 0.0)
+            setattr(target_summary.overtime_breakdown, breakdown_attr, max(0.0, current_val + delta))
+
+    return summaries

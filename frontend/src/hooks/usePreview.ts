@@ -6,7 +6,7 @@ import type {
   CallOutSelections,
   AbsenceSelections,
   AbsenceType,
-  OvertimeOverrides,
+  StatsOverrides,
   StatusMessage,
   EmployeeType,
   ApiFetchParams,
@@ -19,7 +19,7 @@ export const usePreview = () => {
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('daily');
   const [callOutSelections, setCallOutSelections] = useState<CallOutSelections>({});
   const [absenceSelections, setAbsenceSelections] = useState<AbsenceSelections>({});
-  const [overtimeOverrides, setOvertimeOverrides] = useState<OvertimeOverrides>({});
+  const [statsOverrides, setStatsOverrides] = useState<StatsOverrides>({});
   const [status, setStatus] = useState<StatusMessage | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [isHalfSickLoading, setIsHalfSickLoading] = useState(false);
@@ -33,7 +33,7 @@ export const usePreview = () => {
       setPreviewData(data);
       setCallOutSelections({});
       setAbsenceSelections({});
-      setOvertimeOverrides({});
+      setStatsOverrides({});
       setStatus({
         type: 'success',
         message: `✓ ${data.total_records} registreringer behandlet fra ${files.length} fil(er)`,
@@ -62,9 +62,8 @@ export const usePreview = () => {
     }
 
     try {
-      // Save overtime overrides to backend before exporting
-      if (Object.keys(overtimeOverrides).length > 0) {
-        await api.saveOvertimeOverrides(previewData.session_id, overtimeOverrides);
+      if (Object.keys(statsOverrides).length > 0) {
+        await api.saveStatsOverrides(previewData.session_id, statsOverrides);
       }
 
       const response = await fetch(`/api/export/${previewData.session_id}`, {
@@ -101,7 +100,7 @@ export const usePreview = () => {
         message: `✕ Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`,
       });
     }
-  }, [previewData, outputFormat, callOutSelections, overtimeOverrides]);
+  }, [previewData, outputFormat, callOutSelections, statsOverrides]);
 
   const updateCallOutSelection = useCallback((date: string, checked: boolean) => {
     setCallOutSelections(prev => ({ ...prev, [date]: checked }));
@@ -142,15 +141,20 @@ export const usePreview = () => {
     }
   }, [previewData]);
 
-  const updateOvertimeOverride = useCallback(
-    (periodKey: string, field: string, value: number) => {
-      setOvertimeOverrides(prev => ({
-        ...prev,
-        [periodKey]: {
-          ...prev[periodKey],
-          [field]: value,
-        },
-      }));
+  const updateStatsOverride = useCallback(
+    (field: keyof StatsOverrides, value: number) => {
+      setStatsOverrides(prev => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  const resetStatsOverride = useCallback(
+    (field: keyof StatsOverrides) => {
+      setStatsOverrides(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
     },
     []
   );
@@ -164,7 +168,7 @@ export const usePreview = () => {
       setPreviewData(data);
       setCallOutSelections({});
       setAbsenceSelections({});
-      setOvertimeOverrides({});
+      setStatsOverrides({});
       setStatus({
         type: 'success',
         message: `✓ ${data.total_records} registreringer hentet for ${params.employeeName}`,
@@ -190,7 +194,7 @@ export const usePreview = () => {
     setPreviewData(null);
     setCallOutSelections({});
     setAbsenceSelections({});
-    setOvertimeOverrides({});
+    setStatsOverrides({});
     setStatus(undefined);
   }, []);
 
@@ -200,7 +204,7 @@ export const usePreview = () => {
     outputFormat,
     callOutSelections,
     absenceSelections,
-    overtimeOverrides,
+    statsOverrides,
     status,
     isLoading,
     isHalfSickLoading,
@@ -212,7 +216,8 @@ export const usePreview = () => {
     updateCallOutSelection,
     updateAbsenceSelection,
     applyHalfSickDay,
-    updateOvertimeOverride,
+    updateStatsOverride,
+    resetStatsOverride,
     clearPreview,
   };
 };

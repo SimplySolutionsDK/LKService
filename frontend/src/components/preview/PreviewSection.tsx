@@ -11,7 +11,7 @@ import type {
   CallOutSelections,
   AbsenceSelections,
   AbsenceType,
-  OvertimeOverrides,
+  StatsOverrides,
 } from '../../types';
 
 interface PreviewSectionProps {
@@ -20,12 +20,13 @@ interface PreviewSectionProps {
   outputFormat: OutputFormat;
   callOutSelections: CallOutSelections;
   absenceSelections: AbsenceSelections;
-  overtimeOverrides: OvertimeOverrides;
+  statsOverrides: StatsOverrides;
   onTabChange: (tab: TabType) => void;
   onFormatChange: (format: OutputFormat) => void;
   onCallOutChange: (date: string, checked: boolean) => void;
   onAbsenceChange: (date: string, absenceType: AbsenceType) => void;
-  onOvertimeOverride: (periodKey: string, field: string, value: number) => void;
+  onStatsOverride: (field: keyof StatsOverrides, value: number) => void;
+  onStatsReset: (field: keyof StatsOverrides) => void;
   onShowDetails: (index: number) => void;
   onHalfSickDayOpen: () => void;
   onExport: () => void;
@@ -38,12 +39,13 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
   outputFormat,
   callOutSelections,
   absenceSelections,
-  overtimeOverrides,
+  statsOverrides,
   onTabChange,
   onFormatChange,
   onCallOutChange,
   onAbsenceChange,
-  onOvertimeOverride,
+  onStatsOverride,
+  onStatsReset,
   onShowDetails,
   onHalfSickDayOpen,
   onExport,
@@ -69,7 +71,13 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
           <PreviewTabs activeTab={activeTab} onTabChange={onTabChange} />
         </div>
 
-        <PreviewStats data={data} callOutSelections={callOutSelections} />
+        <PreviewStats
+          data={data}
+          callOutSelections={callOutSelections}
+          statsOverrides={statsOverrides}
+          onStatsOverride={onStatsOverride}
+          onStatsReset={onStatsReset}
+        />
 
         {activeTab === 'daily' ? (
           <DailyTable
@@ -81,11 +89,7 @@ export const PreviewSection: React.FC<PreviewSectionProps> = ({
             onShowDetails={onShowDetails}
           />
         ) : (
-          <PeriodTable
-            data={data.periods}
-            overtimeOverrides={overtimeOverrides}
-            onOvertimeOverride={onOvertimeOverride}
-          />
+          <PeriodTable data={data.periods} />
         )}
 
         <ExportBar
