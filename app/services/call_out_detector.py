@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from typing import Dict, List
 
-from app.models.schemas import DailyRecord, DailyOutput, TimeEntry
+from app.models.schemas import DailyRecord, DailyOutput, TimeEntry, DayType
 
 
 # Call out payment amount
@@ -39,14 +39,18 @@ def _is_continuation(entry: TimeEntry, sorted_entries: List[TimeEntry], i: int) 
     return gap <= CALL_OUT_MAX_CONTINUATION_GAP_MINUTES
 
 
+def _is_weekend(record: DailyRecord) -> bool:
+    """True if the day is Saturday or Sunday."""
+    return record.day_type in (DayType.SATURDAY, DayType.SUNDAY)
+
+
 def detect_call_out_eligibility(record: DailyRecord) -> bool:
     """
     Detect if a daily record qualifies for call out payment.
 
-    A day qualifies if ANY time entry starts before 07:00 or at/after 15:30,
-    and is NOT a continuation of prior work. An entry is continuation (not call-out)
-    when the gap between the previous assignment's end and this entry's start is
-    <= 15 minutes.
+    Weekend (Saturday/Sunday): any work on the day qualifies; we always ask for call-out.
+    Weekday: a day qualifies if ANY time entry starts before 07:00 or at/after 15:30,
+    and is NOT a continuation of prior work (gap from previous end to this start > 15 min).
 
     Args:
         record: DailyRecord to check for call out eligibility
@@ -54,6 +58,9 @@ def detect_call_out_eligibility(record: DailyRecord) -> bool:
     Returns:
         True if the day qualifies for call out payment, False otherwise
     """
+    if _is_weekend(record) and record.entries:
+        return True
+
     sorted_entries = sorted(record.entries, key=lambda e: e.start_time)
 
     for i, entry in enumerate(sorted_entries):
@@ -145,7 +152,8 @@ def get_call_out_qualifying_entries(record: DailyRecord) -> list[int]:
     """
     Get indices of time entries that qualify for call-out on a given day.
 
-    An entry qualifies if it starts before 07:00 or at/after 15:30 and is NOT
+    Weekend: all entries in the call-out window (before 07:00 or at/after 15:30) qualify.
+    Weekday: an entry qualifies if it starts before 07:00 or at/after 15:30 and is NOT
     a continuation of prior work (gap between previous end and this start > 15 min).
 
     Args:
@@ -155,24 +163,16 @@ def get_call_out_qualifying_entries(record: DailyRecord) -> list[int]:
         List of indices of qualifying entries in the record.entries list
     """
     sorted_entries = sorted(record.entries, key=lambda e: e.start_time)
-
-    entry_to_index = {}
-    for original_idx, entry in enumerate(record.entries):
-        entry_to_index[id(entry)] = original_idx
-
+    entry_to_index = {id(entry): original_idx for original_idx, entry in enumerate(record.entries)}
     qualifying_indices = []
 
     for i, entry in enumerate(sorted_entries):
         start = entry.start_time
-
-        if start < CALL_OUT_MORNING_END:
-            if not _is_continuation(entry, sorted_entries, i):
-                qualifying_indices.append(entry_to_index[id(entry)])
+        in_window = start < CALL_OUT_MORNING_END or start >= CALL_OUT_EVENING_START
+        if not in_window:
             continue
-
-        if start >= CALL_OUT_EVENING_START:
-            if not _is_continuation(entry, sorted_entries, i):
-                qualifying_indices.append(entry_to_index[id(entry)])
+        if _is_weekend(record) or not _is_continuation(entry, sorted_entries, i):
+            qualifying_indices.append(entry_to_index[id(entry)])
 
     return qualifying_indices
 
@@ -198,13 +198,11 @@ def get_call_out_eligible_days(records: list[DailyRecord]) -> list[dict]:
 
             for i, entry in enumerate(sorted_entries):
                 start = entry.start_time
-
-                if start < CALL_OUT_MORNING_END:
-                    if not _is_continuation(entry, sorted_entries, i):
-                        qualifying_times.append(start.strftime("%H:%M"))
-                elif start >= CALL_OUT_EVENING_START:
-                    if not _is_continuation(entry, sorted_entries, i):
-                        qualifying_times.append(start.strftime("%H:%M"))
+                in_window = start < CALL_OUT_MORNING_END or start >= CALL_OUT_EVENING_START
+                if not in_window:
+                    continue
+                if _is_weekend(record) or not _is_continuation(entry, sorted_entries, i):
+                    qualifying_times.append(start.strftime("%H:%M"))
 
             if qualifying_times:
                 eligible_days.append({
